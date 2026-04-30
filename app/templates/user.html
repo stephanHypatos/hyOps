@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Manager</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .sidebar {
+            width: 260px;
+            min-height: 100vh;
+        }
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.75);
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+        .sidebar .nav-link:hover {
+            color: #fff;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        .sidebar .nav-link.active {
+            color: #fff;
+            background-color: #0d6efd;
+        }
+        @media (max-width: 767.98px) {
+            .sidebar {
+                width: 100%;
+                min-height: auto;
+            }
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+<!-- Alpine.js Root Component -->
+<div class="d-flex flex-md-row flex-column" x-data="userManager()" x-init="initData()">
+    
+    <!-- Left Sidebar Navbar -->
+     {% include "components/sidebar.html" %}
+
+    <!-- Main Content Area -->
+    <main class="flex-grow-1 p-4">
+        <h1 class="mb-4">Users</h1>
+
+        <!-- Form Card -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0" x-text="isEditing ? 'Edit User' : 'Add New User'"></h5>
+            </div>
+            <div class="card-body">
+                <form @submit.prevent="submitForm()">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label for="first_name" class="form-label">First Name</label>
+                            <input type="text" class="form-control" id="first_name" x-model="form.first_name" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="last_name" class="form-label">Last Name</label>
+                            <input type="text" class="form-control" id="last_name" x-model="form.last_name" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" x-model="form.email" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="phone" class="form-label">Phone</label>
+                            <input type="tel" class="form-control" id="phone" x-model="form.phone" required>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <label for="organization_id" class="form-label">Organization</label>
+                            <select class="form-select" id="organization_id" x-model="form.organization_id" required>
+                                <option value="" disabled selected>Select Organization...</option>
+                                <template x-for="org in organizations" :key="org.id">
+                                    <option :value="org.id" x-text="org.name"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <!-- Subtype Dropdown -->
+                        <div class="col-md-3">
+                            <label for="subtype_id" class="form-label">Subtype</label>
+                            <select class="form-select" id="subtype_id" x-model="form.subtype_id" required>
+                                <option value="" disabled selected>Select Subtype...</option>
+                                <template x-for="sub in subtypes" :key="sub.id">
+                                    <option :value="sub.id" x-text="formatSubtypeName(sub.name)"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label for="type" class="form-label">User Type</label>
+                            <select class="form-select" id="type" x-model="form.type" required>
+                                <option value="customer">Customer</option>
+                                <option value="partner">Partner</option>
+                                <option value="internal">Internal</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label for="role" class="form-label">Role</label>
+                            <select class="form-select" id="role" x-model="form.role" required>
+                                <option value="admin">Admin</option>
+                                <option value="enduser">End User</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <button type="submit" class="btn" :class="isEditing ? 'btn-warning' : 'btn-primary'" x-text="isEditing ? 'Update User' : 'Create User'"></button>
+                        <button type="button" class="btn btn-secondary" x-show="isEditing" @click="resetForm()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Table Card -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">User List</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Organization</th>
+                                <th>Subtype</th> <!-- Added Subtype Column -->
+                                <th>Type</th>
+                                <th>Role</th>
+                                <th style="width: 150px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr x-show="loading">
+                                <td colspan="7" class="text-center text-muted py-4">Loading users...</td>
+                            </tr>
+                            <tr x-show="!loading && users.length === 0">
+                                <td colspan="7" class="text-center text-muted py-4">No users found.</td>
+                            </tr>
+                            
+                            <template x-for="user in users" :key="user.id">
+                                <tr>
+                                    <td class="fw-semibold" x-text="user.first_name + ' ' + user.last_name"></td>
+                                    <td x-text="user.email"></td>
+                                    <td x-text="getOrgName(user.organization_id)"></td>
+                                    <td x-text="getSubtypeName(user.subtype_id)"></td> <!-- Display Subtype Name -->
+                                    <td>
+                                        <span class="badge text-capitalize" :class="'bg-' + getTypeBadgeColor(user.type)" x-text="user.type"></span>
+                                    </td>
+                                    <td>
+                                        <span class="badge text-capitalize" :class="user.role === 'admin' ? 'bg-danger' : 'bg-secondary'" x-text="user.role"></span>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-warning" @click="editUser(user)">Edit</button>
+                                        <button class="btn btn-sm btn-outline-danger" @click="deleteUser(user)">Delete</button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<!-- Bootstrap 5 JS Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Alpine.js -->
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+<script>
+    function userManager() {
+        return {
+            // State
+            users: [],
+            organizations: [],
+            subtypes: [], // Added subtypes state
+            loading: true,
+            isEditing: false,
+            form: {
+                id: '',
+                organization_id: '',
+                type: 'customer',
+                subtype_id: '',
+                role: 'enduser',
+                first_name: '',
+                last_name: '',
+                email: '',
+                phone: ''
+            },
+
+            // API Base URLs
+            userApi: "http://localhost:8000/user",
+            orgApi: "http://localhost:8000/organization",
+            subtypeApi: "http://localhost:8000/subtype",
+
+            // Initialization
+            async initData() {
+                // Fetch dropdown data first, then users
+                await Promise.all([this.fetchOrganizations(), this.fetchSubtypes()]);
+                await this.fetchUsers();
+            },
+
+            // Fetch all users
+            async fetchUsers() {
+                this.loading = true;
+                try {
+                    const response = await fetch(`${this.userApi}/users`);
+                    if (!response.ok) throw new Error("Failed to fetch users");
+                    this.users = await response.json();
+                } catch (error) {
+                    console.error(error);
+                    alert("Error fetching users.");
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            // Fetch organizations for the select dropdown
+            async fetchOrganizations() {
+                try {
+                    const response = await fetch(`${this.orgApi}/organizations`);
+                    if (!response.ok) throw new Error("Failed to fetch organizations");
+                    this.organizations = await response.json();
+                } catch (error) {
+                    console.error(error);
+                }
+            },
+
+            // Fetch subtypes for the select dropdown
+            async fetchSubtypes() {
+                try {
+                    const response = await fetch(`${this.subtypeApi}/subtypes`);
+                    if (!response.ok) throw new Error("Failed to fetch subtypes");
+                    this.subtypes = await response.json();
+                } catch (error) {
+                    console.error(error);
+                }
+            },
+
+            // Handle Create or Update
+            async submitForm() {
+                let payload = JSON.parse(JSON.stringify(this.form));
+                
+                try {
+                    if (this.isEditing) {
+                        const id = payload.id;
+                        Object.keys(payload).forEach((k) => payload[k] === "" && delete payload[k]);
+                        
+                        const response = await fetch(`${this.userApi}/?id=${id}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (!response.ok) throw new Error("Failed to update user");
+                    } else {
+                        delete payload.id;
+                        const response = await fetch(`${this.userApi}/`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (!response.ok) throw new Error("Failed to create user");
+                    }
+
+                    this.resetForm();
+                    await this.fetchUsers(); 
+                } catch (error) {
+                    console.error(error);
+                    alert("Error saving user.");
+                }
+            },
+
+            // Populate form for editing
+            editUser(user) {
+                this.isEditing = true;
+                this.form = JSON.parse(JSON.stringify(user));
+            },
+
+            // Delete user
+            async deleteUser(user) {
+                if (!confirm(`Are you sure you want to delete ${user.first_name} ${user.last_name}?`)) return;
+
+                try {
+                    const response = await fetch(`${this.userApi}/?id=${user.id}`, {
+                        method: "DELETE"
+                    });
+
+                    if (!response.ok) throw new Error("Failed to delete user");
+                    await this.fetchUsers(); 
+                } catch (error) {
+                    console.error(error);
+                    alert("Error deleting user.");
+                }
+            },
+
+            // Reset form state
+            resetForm() {
+                this.isEditing = false;
+                this.form = {
+                    id: '',
+                    organization_id: '',
+                    type: 'customer',
+                    subtype_id: '',
+                    role: 'enduser',
+                    first_name: '',
+                    last_name: '',
+                    email: '',
+                    phone: ''
+                };
+            },
+
+            // Helper: Get Organization Name from UUID
+            getOrgName(orgId) {
+                const org = this.organizations.find(o => o.id === orgId);
+                return org ? org.name : orgId;
+            },
+
+            // Helper: Get Subtype Name from UUID
+            getSubtypeName(subtypeId) {
+                const subtype = this.subtypes.find(s => s.id === subtypeId);
+                return subtype ? this.formatSubtypeName(subtype.name) : subtypeId;
+            },
+
+            // Helper: Format enum string to readable text (e.g., project_manager -> Project Manager)
+            formatSubtypeName(name) {
+                return name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            },
+
+            // Helper: Color code the Type badge
+            getTypeBadgeColor(type) {
+                switch(type) {
+                    case 'customer': return 'primary';
+                    case 'partner': return 'success';
+                    case 'internal': return 'info';
+                    default: return 'secondary';
+                }
+            }
+        }
+    }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Organization Manager</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* Custom styles for the sidebar */
+        .sidebar {
+            width: 260px;
+            min-height: 100vh;
+        }
+        
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.75);
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+        
+        .sidebar .nav-link:hover {
+            color: #fff;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .sidebar .nav-link.active {
+            color: #fff;
+            background-color: #0d6efd;
+        }
+        
+        @media (max-width: 767.98px) {
+            .sidebar {
+                width: 100%;
+                min-height: auto;
+            }
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+<!-- Alpine.js Root Component -->
+<div class="d-flex flex-md-row flex-column" x-data="orgManager()" x-init="fetchOrganizations()">
+    
+    <!-- Left Sidebar Navbar -->
+    {% include "components/sidebar.html" %}
+
+    <!-- Main Content Area -->
+    <main class="flex-grow-1 p-4">
+        <h1 class="mb-4">Organizations</h1>
+
+        <!-- Form Card -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0" x-text="isEditing ? 'Edit Organization' : 'Add New Organization'"></h5>
+            </div>
+            <div class="card-body">
+                <form @submit.prevent="submitForm()">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label for="name" class="form-label">Name</label>
+                            <input type="text" class="form-control" id="name" x-model="form.name" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="type" class="form-label">Type</label>
+                            <select class="form-select" id="type" x-model="form.type" required>
+                                <option value="customer">Customer</option>
+                                <option value="partner">Partner</option>
+                                <option value="internal">Internal</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" x-model="form.email" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="industry" class="form-label">Industry</label>
+                            <input type="text" class="form-control" id="industry" x-model="form.industry" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="country" class="form-label">Country</label>
+                            <input type="text" class="form-control" id="country" x-model="form.country" required>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <button type="submit" class="btn" :class="isEditing ? 'btn-warning' : 'btn-primary'" x-text="isEditing ? 'Update Organization' : 'Create Organization'"></button>
+                        <button type="button" class="btn btn-secondary" x-show="isEditing" @click="resetForm()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Table Card -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Organization List</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Email</th>
+                                <th>Industry</th>
+                                <th>Country</th>
+                                <th style="width: 150px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Loading/Error State -->
+                            <tr x-show="loading">
+                                <td colspan="6" class="text-center text-muted py-4">Loading organizations...</td>
+                            </tr>
+                            <tr x-show="!loading && organizations.length === 0">
+                                <td colspan="6" class="text-center text-muted py-4">No organizations found.</td>
+                            </tr>
+                            
+                            <!-- Data Rows Loop -->
+                            <template x-for="org in organizations" :key="org.id">
+                                <tr>
+                                    <td class="fw-semibold" x-text="org.name"></td>
+                                    <td>
+                                        <span class="badge text-capitalize" :class="'bg-' + getTypeBadgeColor(org.type)" x-text="org.type"></span>
+                                    </td>
+                                    <td x-text="org.email"></td>
+                                    <td x-text="org.industry"></td>
+                                    <td x-text="org.country"></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-warning" @click="editOrganization(org)">Edit</button>
+                                        <button class="btn btn-sm btn-outline-danger" @click="deleteOrganization(org)">Delete</button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<!-- Bootstrap 5 JS Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Alpine.js -->
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+<script>
+    function orgManager() {
+        return {
+            // State
+            organizations: [],
+            loading: true,
+            isEditing: false,
+            form: {
+                id: '',
+                name: '',
+                type: 'customer',
+                email: '',
+                industry: '',
+                country: ''
+            },
+
+            // API Base URL
+            apiBase: "http://localhost:8000/organization",
+
+            // Fetch all organizations
+            async fetchOrganizations() {
+                this.loading = true;
+                try {
+                    const response = await fetch(`${this.apiBase}/organizations`);
+                    if (!response.ok) throw new Error("Failed to fetch");
+                    this.organizations = await response.json();
+                } catch (error) {
+                    console.error(error);
+                    alert("Error fetching organizations. Is the API running?");
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            // Handle Create or Update
+            async submitForm() {
+                // Deep copy form data to avoid modifying the original state directly
+                let payload = JSON.parse(JSON.stringify(this.form));
+                
+                try {
+                    if (this.isEditing) {
+                        // UPDATE (PATCH)
+                        const id = payload.id;
+                        // Remove empty strings so backend exclude_none works properly
+                        Object.keys(payload).forEach((k) => payload[k] === "" && delete payload[k]);
+                        
+                        const response = await fetch(`${this.apiBase}/?id=${id}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (!response.ok) throw new Error("Failed to update");
+                    } else {
+                        // CREATE (POST)
+                        delete payload.id; // Don't send ID on creation
+                        const response = await fetch(`${this.apiBase}/`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (!response.ok) throw new Error("Failed to create");
+                    }
+
+                    this.resetForm();
+                    await this.fetchOrganizations(); // Refresh table
+                } catch (error) {
+                    console.error(error);
+                    alert("Error saving organization.");
+                }
+            },
+
+            // Populate form for editing
+            editOrganization(org) {
+                this.isEditing = true;
+                // Deep copy the org object to the form so table item doesn't mutate while typing
+                this.form = JSON.parse(JSON.stringify(org));
+            },
+
+            // Delete organization
+            async deleteOrganization(org) {
+                if (!confirm(`Are you sure you want to delete ${org.name}?`)) return;
+
+                try {
+                    const response = await fetch(`${this.apiBase}/?id=${org.id}`, {
+                        method: "DELETE"
+                    });
+
+                    if (!response.ok) throw new Error("Failed to delete");
+                    await this.fetchOrganizations(); // Refresh table
+                } catch (error) {
+                    console.error(error);
+                    alert("Error deleting organization.");
+                }
+            },
+
+            // Reset form state
+            resetForm() {
+                this.isEditing = false;
+                this.form = {
+                    id: '',
+                    name: '',
+                    type: 'customer',
+                    email: '',
+                    industry: '',
+                    country: ''
+                };
+            },
+
+            // Helper to color code the Type badge
+            getTypeBadgeColor(type) {
+                switch(type) {
+                    case 'customer': return 'primary';
+                    case 'partner': return 'success';
+                    case 'internal': return 'info';
+                    default: return 'secondary';
+                }
+            }
+        }
+    }
+</script>
+
+</body>
+</html>

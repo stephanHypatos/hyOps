@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Capability Manager</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .sidebar {
+            width: 260px;
+            min-height: 100vh;
+        }
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.75);
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+        .sidebar .nav-link:hover {
+            color: #fff;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        .sidebar .nav-link.active {
+            color: #fff;
+            background-color: #0d6efd;
+        }
+        @media (max-width: 767.98px) {
+            .sidebar {
+                width: 100%;
+                min-height: auto;
+            }
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+<!-- Alpine.js Root Component -->
+<div class="d-flex flex-md-row flex-column" x-data="capabilityManager()" x-init="fetchCapabilities()">
+    
+    <!-- Jinja2 Sidebar Include -->
+    {% include "components/sidebar.html" %}
+
+    <!-- Main Content Area -->
+    <main class="flex-grow-1 p-4">
+        <h1 class="mb-4">Capability (Module)</h1>
+
+        <!-- Form Card -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0" x-text="isEditing ? 'Edit Capability' : 'Add New Capability'"></h5>
+            </div>
+            <div class="card-body">
+                <form @submit.prevent="submitForm()">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label for="contract" class="form-label">Contract / Product Name</label>
+                            <input type="text" class="form-control" id="contract" x-model="form.contract" required placeholder="e.g., Professional Services">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="name" class="form-label">Module / Capability Name</label>
+                            <input type="text" class="form-control" id="name" x-model="form.name" required placeholder="e.g., Invoice Processing">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="description" class="form-label">Description (Optional)</label>
+                            <input type="text" class="form-control" id="description" x-model="form.description" placeholder="Brief description">
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <button type="submit" class="btn" :class="isEditing ? 'btn-warning' : 'btn-primary'" x-text="isEditing ? 'Update Capability' : 'Create Capability'"></button>
+                        <button type="button" class="btn btn-secondary" x-show="isEditing" @click="resetForm()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Table Card -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Capability List</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Contract / Product</th>
+                                <th>Module Name</th>
+                                <th>Description</th>
+                                <th style="width: 150px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr x-show="loading">
+                                <td colspan="4" class="text-center text-muted py-4">Loading capabilities...</td>
+                            </tr>
+                            <tr x-show="!loading && capabilities.length === 0">
+                                <td colspan="4" class="text-center text-muted py-4">No capabilities found.</td>
+                            </tr>
+                            
+                            <template x-for="cap in capabilities" :key="cap.id">
+                                <tr>
+                                    <td class="fw-semibold" x-text="cap.contract"></td>
+                                    <td x-text="cap.name"></td>
+                                    <td x-text="cap.description || '—'"></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-warning" @click="editCapability(cap)">Edit</button>
+                                        <button class="btn btn-sm btn-outline-danger" @click="deleteCapability(cap)">Delete</button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<!-- Bootstrap 5 JS Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Alpine.js -->
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+<script>
+    function capabilityManager() {
+        return {
+            // State
+            capabilities: [],
+            loading: true,
+            isEditing: false,
+            form: {
+                id: '',
+                contract: '',
+                name: '',
+                description: ''
+            },
+
+            // API Base URL
+            apiBase: "http://localhost:8000/capability",
+
+            // Fetch all capabilities
+            async fetchCapabilities() {
+                this.loading = true;
+                try {
+                    const response = await fetch(`${this.apiBase}/capabilities`);
+                    if (!response.ok) throw new Error("Failed to fetch capabilities");
+                    this.capabilities = await response.json();
+                } catch (error) {
+                    console.error(error);
+                    alert("Error fetching capabilities. Is the API running?");
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            // Handle Create or Update
+            async submitForm() {
+                let payload = JSON.parse(JSON.stringify(this.form));
+                
+                try {
+                    if (this.isEditing) {
+                        // UPDATE (PATCH)
+                        const id = payload.id;
+                        Object.keys(payload).forEach((k) => payload[k] === "" && delete payload[k]);
+                        
+                        const response = await fetch(`${this.apiBase}/?id=${id}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (!response.ok) throw new Error("Failed to update capability");
+                    } else {
+                        // CREATE (POST)
+                        delete payload.id;
+                        if (payload.description === "") delete payload.description;
+
+                        const response = await fetch(`${this.apiBase}/`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (!response.ok) throw new Error("Failed to create capability");
+                    }
+
+                    this.resetForm();
+                    await this.fetchCapabilities(); 
+                } catch (error) {
+                    console.error(error);
+                    alert("Error saving capability.");
+                }
+            },
+
+            // Populate form for editing
+            editCapability(cap) {
+                this.isEditing = true;
+                this.form = JSON.parse(JSON.stringify(cap));
+            },
+
+            // Delete capability
+            async deleteCapability(cap) {
+                if (!confirm(`Are you sure you want to delete ${cap.name}?`)) return;
+
+                try {
+                    const response = await fetch(`${this.apiBase}/?id=${cap.id}`, {
+                        method: "DELETE"
+                    });
+
+                    if (!response.ok) throw new Error("Failed to delete capability");
+                    await this.fetchCapabilities(); 
+                } catch (error) {
+                    console.error(error);
+                    alert("Error deleting capability. It might be linked to existing Features.");
+                }
+            },
+
+            // Reset form state
+            resetForm() {
+                this.isEditing = false;
+                this.form = {
+                    id: '',
+                    contract: '',
+                    name: '',
+                    description: ''
+                };
+            }
+        }
+    }
+</script>
+
+</body>
+</html>

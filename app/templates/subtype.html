@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subtype Manager</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .sidebar {
+            width: 260px;
+            min-height: 100vh;
+        }
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.75);
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+        .sidebar .nav-link:hover {
+            color: #fff;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        .sidebar .nav-link.active {
+            color: #fff;
+            background-color: #0d6efd;
+        }
+        @media (max-width: 767.98px) {
+            .sidebar {
+                width: 100%;
+                min-height: auto;
+            }
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+<!-- Alpine.js Root Component -->
+<div class="d-flex flex-md-row flex-column" x-data="subtypeManager()" x-init="fetchSubtypes()">
+    
+    <!-- Left Sidebar Navbar -->
+    {% include "components/sidebar.html" %}
+
+    <!-- Main Content Area -->
+    <main class="flex-grow-1 p-4">
+        <h1 class="mb-4">Subtypes</h1>
+
+        <!-- Form Card -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0" x-text="isEditing ? 'Edit Subtype' : 'Add New Subtype'"></h5>
+            </div>
+            <div class="card-body">
+                <form @submit.prevent="submitForm()">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="name" class="form-label">Subtype Name</label>
+                            <select class="form-select" id="name" x-model="form.name" required>
+                                <option value="" disabled selected>Select Subtype...</option>
+                                <!-- All Enum Options from the Database Model -->
+                                <option value="project_manager">Project Manager</option>
+                                <option value="business_analyst">Business Analyst</option>
+                                <option value="accountant">Accountant</option>
+                                <option value="integration_expert">Integration Expert</option>
+                                <option value="accounts_payable_lead">Accounts Payable Lead</option>
+                                <option value="business_lead">Business Lead</option>
+                                <option value="project_lead">Project Lead</option>
+                                <option value="clerk">Clerk</option>
+                                <option value="coe">COE</option>
+                                <option value="solution_architect">Solution Architect</option>
+                                <option value="project_sponsor">Project Sponsor</option>
+                                <option value="project_champion">Project Champion</option>
+                                <option value="sap_basis">SAP Basis</option>
+                                <option value="technical_lead">Technical Lead</option>
+                                <option value="customer_success_manager">Customer Success Manager</option>
+                                <option value="head_of_professional_service">Head of Professional Service</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="description" class="form-label">Description (Optional)</label>
+                            <input type="text" class="form-control" id="description" x-model="form.description" placeholder="Brief description of this subtype">
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <button type="submit" class="btn" :class="isEditing ? 'btn-warning' : 'btn-primary'" x-text="isEditing ? 'Update Subtype' : 'Create Subtype'"></button>
+                        <button type="button" class="btn btn-secondary" x-show="isEditing" @click="resetForm()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Table Card -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Subtype List</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Subtype Name</th>
+                                <th>Description</th>
+                                <th style="width: 150px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr x-show="loading">
+                                <td colspan="3" class="text-center text-muted py-4">Loading subtypes...</td>
+                            </tr>
+                            <tr x-show="!loading && subtypes.length === 0">
+                                <td colspan="3" class="text-center text-muted py-4">No subtypes found.</td>
+                            </tr>
+                            
+                            <template x-for="subtype in subtypes" :key="subtype.id">
+                                <tr>
+                                    <td class="fw-semibold" x-text="formatSubtypeName(subtype.name)"></td>
+                                    <td x-text="subtype.description || '—'"></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-warning" @click="editSubtype(subtype)">Edit</button>
+                                        <button class="btn btn-sm btn-outline-danger" @click="deleteSubtype(subtype)">Delete</button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<!-- Bootstrap 5 JS Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Alpine.js -->
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+<script>
+    function subtypeManager() {
+        return {
+            // State
+            subtypes: [],
+            loading: true,
+            isEditing: false,
+            form: {
+                id: '',
+                name: '',
+                description: ''
+            },
+
+            // API Base URL
+            apiBase: "http://localhost:8000/subtype",
+
+            // Fetch all subtypes
+            async fetchSubtypes() {
+                this.loading = true;
+                try {
+                    const response = await fetch(`${this.apiBase}/subtypes`);
+                    if (!response.ok) throw new Error("Failed to fetch subtypes");
+                    this.subtypes = await response.json();
+                } catch (error) {
+                    console.error(error);
+                    alert("Error fetching subtypes. Is the API running?");
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            // Handle Create or Update
+            async submitForm() {
+                let payload = JSON.parse(JSON.stringify(this.form));
+                
+                try {
+                    if (this.isEditing) {
+                        // UPDATE (PATCH)
+                        const id = payload.id;
+                        // Clean up empty strings for PATCH exclude_none
+                        Object.keys(payload).forEach((k) => payload[k] === "" && delete payload[k]);
+                        
+                        const response = await fetch(`${this.apiBase}/?id=${id}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (!response.ok) throw new Error("Failed to update subtype");
+                    } else {
+                        // CREATE (POST)
+                        delete payload.id;
+                        // Remove description if empty on creation so DB handles null
+                        if (payload.description === "") delete payload.description;
+
+                        const response = await fetch(`${this.apiBase}/`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (!response.ok) throw new Error("Failed to create subtype");
+                    }
+
+                    this.resetForm();
+                    await this.fetchSubtypes(); 
+                } catch (error) {
+                    console.error(error);
+                    alert("Error saving subtype.");
+                }
+            },
+
+            // Populate form for editing
+            editSubtype(subtype) {
+                this.isEditing = true;
+                // Deep copy to prevent table live-editing
+                this.form = JSON.parse(JSON.stringify(subtype));
+            },
+
+            // Delete subtype
+            async deleteSubtype(subtype) {
+                if (!confirm(`Are you sure you want to delete ${this.formatSubtypeName(subtype.name)}?`)) return;
+
+                try {
+                    const response = await fetch(`${this.apiBase}/?id=${subtype.id}`, {
+                        method: "DELETE"
+                    });
+
+                    if (!response.ok) throw new Error("Failed to delete subtype");
+                    await this.fetchSubtypes(); 
+                } catch (error) {
+                    console.error(error);
+                    alert("Error deleting subtype. It might be in use by a User.");
+                }
+            },
+
+            // Reset form state
+            resetForm() {
+                this.isEditing = false;
+                this.form = {
+                    id: '',
+                    name: '',
+                    description: ''
+                };
+            },
+
+            // Helper: Format enum string to readable text (e.g., project_manager -> Project Manager)
+            formatSubtypeName(name) {
+                if (!name) return "";
+                return name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            }
+        }
+    }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feature Manager</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .sidebar { width: 260px; min-height: 100vh; }
+        .sidebar .nav-link { color: rgba(255, 255, 255, 0.75); border-radius: 5px; margin-bottom: 5px; }
+        .sidebar .nav-link:hover { color: #fff; background-color: rgba(255, 255, 255, 0.1); }
+        .sidebar .nav-link.active { color: #fff; background-color: #0d6efd; }
+        .sidebar .submenu { padding-left: 1rem; }
+        .sidebar .nav-link[data-bs-toggle="collapse"]::after { content: '\25BC'; float: right; font-size: 0.7rem; margin-top: 0.3rem; transition: transform 0.2s ease-in-out; }
+        .sidebar .nav-link[data-bs-toggle="collapse"][aria-expanded="false"]::after { transform: rotate(-90deg); }
+        @media (max-width: 767.98px) { .sidebar { width: 100%; min-height: auto; } }
+        
+        /* Custom style for text areas in the form */
+        .form-control, .form-select { font-size: 0.9rem; }
+    </style>
+</head>
+<body class="bg-light">
+
+<!-- Alpine.js Root Component -->
+<div class="d-flex flex-md-row flex-column" x-data="featureManager()" x-init="initData()">
+    
+    <!-- Jinja2 Sidebar Include -->
+    {% include "components/sidebar.html" %}
+
+    <!-- Main Content Area -->
+    <main class="flex-grow-1 p-4">
+        <h1 class="mb-4">Features</h1>
+
+        <!-- Form Card -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0" x-text="isEditing ? 'Edit Feature' : 'Add New Feature'"></h5>
+            </div>
+            <div class="card-body">
+                <form @submit.prevent="submitForm()">
+                    
+                    <!-- Row 1: Core Info & Foreign Keys -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Name</label>
+                            <input type="text" class="form-control" x-model="form.name" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Capability</label>
+                            <select class="form-select" x-model="form.capability_id" required>
+                                <option value="" disabled>Select Capability...</option>
+                                <template x-for="cap in capabilities" :key="cap.id">
+                                    <option :value="cap.id" x-text="cap.name"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Owner (User)</label>
+                            <select class="form-select" x-model="form.owner_id" required>
+                                <option value="" disabled>Select Owner...</option>
+                                <template x-for="u in users" :key="u.id">
+                                    <option :value="u.id" x-text="u.first_name + ' ' + u.last_name"></option>
+                                </template>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Scope & Config -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Scope Type</label>
+                            <select class="form-select" x-model="form.scope_type" required>
+                                <option value="standard">Standard</option>
+                                <option value="non_standard">Non-Standard</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Multiple Value</label>
+                            <input type="number" class="form-control" x-model="form.multiple_value" required min="0">
+                        </div>
+                        <div class="col-md-7">
+                            <label class="form-label">Reference Documentation</label>
+                            <input type="text" class="form-control" x-model="form.reference_documentation" placeholder="Optional link or text">
+                        </div>
+                    </div>
+
+                    <!-- Row 3: Boolean Switches -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <div class="form-check form-switch mt-md-4">
+                                <input class="form-check-input" type="checkbox" x-model="form.scoping_questionnaire">
+                                <label class="form-check-label">Scoping Questionnaire</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check form-switch mt-md-4">
+                                <input class="form-check-input" type="checkbox" x-model="form.included_in_ootb">
+                                <label class="form-check-label">Included in OOTB</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check form-switch mt-md-4">
+                                <input class="form-check-input" type="checkbox" x-model="form.default_enabled">
+                                <label class="form-check-label">Default Enabled</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check form-switch mt-md-4">
+                                <input class="form-check-input" type="checkbox" x-model="form.active">
+                                <label class="form-check-label">Active</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row 4: Text Areas -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Service Description</label>
+                            <textarea class="form-control" x-model="form.service_description" rows="3" required></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Requirement Description</label>
+                            <textarea class="form-control" x-model="form.requirement_description" rows="3" required></textarea>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Solution Description</label>
+                            <textarea class="form-control" x-model="form.solution_description" rows="3" required></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Deliverables</label>
+                            <textarea class="form-control" x-model="form.deliverables" rows="3" required></textarea>
+                        </div>
+                    </div>
+
+                    <div class="mt-2">
+                        <button type="submit" class="btn" :class="isEditing ? 'btn-warning' : 'btn-primary'" x-text="isEditing ? 'Update Feature' : 'Create Feature'"></button>
+                        <button type="button" class="btn btn-secondary" x-show="isEditing" @click="resetForm()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Table Card -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Feature List</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Name</th>
+                                <th>Capability</th>
+                                <th>Owner</th>
+                                <th>Scope</th>
+                                <th>Status</th>
+                                <th style="width: 150px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr x-show="loading">
+                                <td colspan="6" class="text-center text-muted py-4">Loading features...</td>
+                            </tr>
+                            <tr x-show="!loading && features.length === 0">
+                                <td colspan="6" class="text-center text-muted py-4">No features found.</td>
+                            </tr>
+                            
+                            <template x-for="feat in features" :key="feat.id">
+                                <tr>
+                                    <td class="fw-semibold" x-text="feat.name"></td>
+                                    <td x-text="getCapabilityName(feat.capability_id)"></td>
+                                    <td x-text="getUserName(feat.owner_id)"></td>
+                                    <td>
+                                        <span class="badge" :class="feat.scope_type === 'standard' ? 'bg-success' : 'bg-warning text-dark'" x-text="feat.scope_type === 'standard' ? 'Standard' : 'Non-Standard'"></span>
+                                    </td>
+                                    <td>
+                                        <span class="badge" :class="feat.active ? 'bg-primary' : 'bg-secondary'" x-text="feat.active ? 'Active' : 'Inactive'"></span>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-warning" @click="editFeature(feat)">Edit</button>
+                                        <button class="btn btn-sm btn-outline-danger" @click="deleteFeature(feat)">Delete</button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<!-- Bootstrap 5 JS Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Alpine.js -->
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+<script>
+    function featureManager() {
+        return {
+            // State
+            features: [],
+            capabilities: [],
+            users: [],
+            loading: true,
+            isEditing: false,
+            form: {
+                id: '',
+                capability_id: '',
+                name: '',
+                service_description: '',
+                requirement_description: '',
+                solution_description: '',
+                deliverables: '',
+                scope_type: 'standard',
+                owner_id: '',
+                scoping_questionnaire: false,
+                reference_documentation: '',
+                included_in_ootb: false,
+                default_enabled: false,
+                active: true,
+                multiple_value: 0
+            },
+
+            // API Base URLs
+            featureApi: "http://localhost:8000/feature",
+            capabilityApi: "http://localhost:8000/capability",
+            userApi: "http://localhost:8000/user",
+
+            // Initialization
+            async initData() {
+                await Promise.all([this.fetchCapabilities(), this.fetchUsers()]);
+                await this.fetchFeatures();
+            },
+
+            // Fetch features
+            async fetchFeatures() {
+                this.loading = true;
+                try {
+                    const response = await fetch(`${this.featureApi}/features`);
+                    if (!response.ok) throw new Error("Failed to fetch features");
+                    this.features = await response.json();
+                } catch (error) {
+                    console.error(error);
+                    alert("Error fetching features.");
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            // Fetch capabilities for dropdown
+            async fetchCapabilities() {
+                try {
+                    const response = await fetch(`${this.capabilityApi}/capabilities`);
+                    if (!response.ok) throw new Error("Failed to fetch capabilities");
+                    this.capabilities = await response.json();
+                } catch (error) { console.error(error); }
+            },
+
+            // Fetch users for dropdown
+            async fetchUsers() {
+                try {
+                    const response = await fetch(`${this.userApi}/users`);
+                    if (!response.ok) throw new Error("Failed to fetch users");
+                    this.users = await response.json();
+                } catch (error) { console.error(error); }
+            },
+
+            // Handle Create or Update
+            async submitForm() {
+                let payload = JSON.parse(JSON.stringify(this.form));
+                
+                try {
+                    if (this.isEditing) {
+                        const id = payload.id;
+                        Object.keys(payload).forEach((k) => {
+                            if (payload[k] === "" || payload[k] === null) delete payload[k];
+                        });
+                        
+                        const response = await fetch(`${this.featureApi}/?id=${id}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(payload)
+                        });
+                        if (!response.ok) throw new Error("Failed to update feature");
+                    } else {
+                        delete payload.id;
+                        if (payload.reference_documentation === "") delete payload.reference_documentation;
+
+                        const response = await fetch(`${this.featureApi}/`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(payload)
+                        });
+                        if (!response.ok) throw new Error("Failed to create feature");
+                    }
+
+                    this.resetForm();
+                    await this.fetchFeatures(); 
+                } catch (error) {
+                    console.error(error);
+                    alert("Error saving feature.");
+                }
+            },
+
+            // Populate form for editing
+            editFeature(feat) {
+                this.isEditing = true;
+                this.form = JSON.parse(JSON.stringify(feat));
+            },
+
+            // Delete feature
+            async deleteFeature(feat) {
+                if (!confirm(`Are you sure you want to delete ${feat.name}?`)) return;
+                try {
+                    const response = await fetch(`${this.featureApi}/?id=${feat.id}`, { method: "DELETE" });
+                    if (!response.ok) throw new Error("Failed to delete feature");
+                    await this.fetchFeatures(); 
+                } catch (error) {
+                    console.error(error);
+                    alert("Error deleting feature.");
+                }
+            },
+
+            // Reset form state
+            resetForm() {
+                this.isEditing = false;
+                this.form = {
+                    id: '',
+                    capability_id: '',
+                    name: '',
+                    service_description: '',
+                    requirement_description: '',
+                    solution_description: '',
+                    deliverables: '',
+                    scope_type: 'standard',
+                    owner_id: '',
+                    scoping_questionnaire: false,
+                    reference_documentation: '',
+                    included_in_ootb: false,
+                    default_enabled: false,
+                    active: true,
+                    multiple_value: 0
+                };
+            },
+
+            // Helper: Get Capability Name
+            getCapabilityName(id) {
+                const cap = this.capabilities.find(c => c.id === id);
+                return cap ? cap.name : id;
+            },
+
+            // Helper: Get User Name
+            getUserName(id) {
+                const user = this.users.find(u => u.id === id);
+                return user ? `${user.first_name} ${user.last_name}` : id;
+            }
+        }
+    }
+</script>
+
+</body>
+</html>

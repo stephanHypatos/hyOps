@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  # FastAPI Application Service
+  api:
+    build: .
+    container_name: hyops_api
+    ports:
+      - "8000:8000"
+    environment:
+      # The database URL. The host is "db" (the service name below).
+      # We use postgresql+asyncpg because your app uses AsyncSession.
+      - POSTGRESQL_URL=postgresql+asyncpg://app_user:app_password@db:5432/app_db
+    volumes:
+      # Mount the current root folder (.) to the container's /app folder
+      # This enables hot-reloading for both Python code and HTML templates
+      - .:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # PostgreSQL Database Service
+  db:
+    image: postgres:15-alpine
+    container_name: hyops_db
+    environment:
+      - POSTGRES_USER=app_user
+      - POSTGRES_PASSWORD=app_password
+      - POSTGRES_DB=app_db
+    ports:
+      # Expose port so you can inspect the DB with tools like DBeaver/pgAdmin
+      - "5432:5432"
+    volumes:
+      # Persist database data even if the container goes down
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # Checks if Postgres is ready to accept connections before starting FastAPI
+      test: ["CMD-SHELL", "pg_isready -U app_user -d app_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
