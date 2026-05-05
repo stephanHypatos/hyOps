@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Templates</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .sidebar { width: 260px; min-height: 100vh; }
+        .sidebar .nav-link { color: rgba(255, 255, 255, 0.75); border-radius: 5px; margin-bottom: 5px; }
+        .sidebar .nav-link:hover { color: #fff; background-color: rgba(255, 255, 255, 0.1); }
+        .sidebar .nav-link.active { color: #fff; background-color: #0d6efd; }
+        .sidebar .submenu { padding-left: 1rem; }
+        .sidebar .nav-link[data-bs-toggle="collapse"]::after { content: '\25BC'; float: right; font-size: 0.7rem; margin-top: 0.3rem; transition: transform 0.2s ease-in-out; }
+        .sidebar .nav-link[data-bs-toggle="collapse"][aria-expanded="false"]::after { transform: rotate(-90deg); }
+        @media (max-width: 767.98px) { .sidebar { width: 100%; min-height: auto; } }
+    </style>
+</head>
+<body class="bg-light">
+
+<div class="d-flex flex-md-row flex-column" x-data="documentTemplateManager()" x-init="initData()">
+    {% include "components/sidebar.html" %}
+
+    <main class="flex-grow-1 p-4">
+        <h1 class="mb-4">Document Templates</h1>
+
+        <!-- Form Card -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0" x-text="isEditing ? 'Edit Template' : 'Add New Template'"></h5>
+            </div>
+            <div class="card-body">
+                <form @submit.prevent="submitForm()">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Template Name</label>
+                            <input type="text" class="form-control" x-model="form.name" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Type</label>
+                            <select class="form-select" x-model="form.type" required>
+                                <option value="sow">SOW</option>
+                                <option value="success_contract">Success Contract</option>
+                                <option value="solution_design">Solution Design</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Version</label>
+                            <input type="number" class="form-control" x-model="form.version" required min="1">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Created By (User)</label>
+                            <select class="form-select" x-model="form.created_by_id" required>
+                                <option value="" disabled>Select User...</option>
+                                <template x-for="u in users" :key="u.id">
+                                    <option :value="u.id" x-text="u.first_name + ' ' + u.last_name"></option>
+                                </template>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-12">
+                            <label class="form-label">Variables (Comma-separated)</label>
+                            <input type="text" class="form-control" x-model="variablesInput" placeholder="e.g., project.name, customer.email, deal_winner">
+                            <div class="form-text">Type variables separated by commas. They will be saved as a JSON array.</div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-12">
+                            <label class="form-label">Markdown Content</label>
+                            <textarea class="form-control font-monospace" x-model="form.markdown_content" rows="8" required placeholder="# SOW for {project.name}..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <div class="form-check form-switch mt-md-4">
+                                <input class="form-check-input" type="checkbox" x-model="form.is_active" id="isActiveSwitch">
+                                <label class="form-check-label" for="isActiveSwitch">Is Active</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-2">
+                        <button type="submit" class="btn" :class="isEditing ? 'btn-warning' : 'btn-primary'" x-text="isEditing ? 'Update Template' : 'Create Template'"></button>
+                        <button type="button" class="btn btn-secondary" x-show="isEditing" @click="resetForm()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Table Card -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-white"><h5 class="mb-0">Template List</h5></div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Version</th>
+                                <th>Created By</th>
+                                <th>Active</th>
+                                <th style="width: 150px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr x-show="loading"><td colspan="6" class="text-center text-muted py-4">Loading...</td></tr>
+                            <tr x-show="!loading && templates.length === 0"><td colspan="6" class="text-center text-muted py-4">No templates found.</td></tr>
+                            <template x-for="tmpl in templates" :key="tmpl.id">
+                                <tr>
+                                    <td class="fw-semibold" x-text="tmpl.name"></td>
+                                    <td>
+                                        <span class="badge text-capitalize" :class="getTypeBadgeColor(tmpl.type)" x-text="tmpl.type.replace('_', ' ')"></span>
+                                    </td>
+                                    <td x-text="'v' + tmpl.version"></td>
+                                    <td x-text="getUserName(tmpl.created_by_id)"></td>
+                                    <td>
+                                        <span class="badge" :class="tmpl.is_active ? 'bg-success' : 'bg-secondary'" x-text="tmpl.is_active ? 'Active' : 'Inactive'"></span>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-warning" @click="editTemplate(tmpl)">Edit</button>
+                                        <button class="btn btn-sm btn-outline-danger" @click="deleteTemplate(tmpl)">Delete</button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script>
+    function documentTemplateManager() {
+        return {
+            templates: [], users: [], loading: true, isEditing: false,
+            form: { id: '', name: '', type: 'sow', markdown_content: '', version: 1, is_active: true, created_by_id: '' },
+            variablesInput: '', // Helper for UI comma-separated string
+            error: '',
+
+            apiBase: "/document-template",
+            userApi: "/user",
+
+            async initData() {
+                await this.fetchUsers();
+                await this.fetchTemplates();
+            },
+
+            async fetchTemplates() {
+                this.loading = true;
+                try {
+                    const res = await fetch(`${this.apiBase}/document-templates`);
+                    if (!res.ok) throw new Error();
+                    this.templates = await res.json();
+                } catch (e) { alert("Error fetching templates"); } finally { this.loading = false; }
+            },
+
+            async fetchUsers() {
+                try {
+                    const res = await fetch(`${this.userApi}/users`);
+                    if (!res.ok) throw new Error();
+                    this.users = await res.json();
+                } catch (e) { console.error("Error fetching users"); }
+            },
+
+            parseVariables() {
+                // Guarantees an empty array [] is returned if input is blank, 
+                // which matches our list[str] schema requirement perfectly.
+                if (!this.variablesInput || this.variablesInput.trim() === "") return [];
+                return this.variablesInput.split(",").map(v => v.trim()).filter(v => v !== "");
+            },
+
+            async submitForm() {
+                let payload = JSON.parse(JSON.stringify(this.form));
+                payload.variables = this.parseVariables(); // Inject the parsed array
+
+                try {
+                    if (this.isEditing) {
+                        const id = payload.id;
+                        // Clean up empty strings for PATCH exclude_none
+                        Object.keys(payload).forEach((k) => { 
+                            if (payload[k] === "" || payload[k] === null) delete payload[k]; 
+                        });
+                        
+                        const res = await fetch(`${this.apiBase}/?id=${id}`, { 
+                            method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) 
+                        });
+                        if (!res.ok) {
+                            const errData = await res.json();
+                            throw new Error(errData.detail || "Validation Error");
+                        }
+                    } else {
+                        delete payload.id;
+                        const res = await fetch(`${this.apiBase}/`, { 
+                            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) 
+                        });
+                        if (!res.ok) {
+                            const errData = await res.json();
+                            throw new Error(errData.detail || "Validation Error");
+                        }
+                    }
+                    this.resetForm(); 
+                    await this.fetchTemplates();
+                } catch (e) { 
+                    alert("Error saving template: " + e.message); 
+                }
+            },
+
+            editTemplate(tmpl) {
+                this.isEditing = true;
+                this.form = JSON.parse(JSON.stringify(tmpl));
+                // Convert JSON array back to comma-separated string for the UI input
+                this.variablesInput = Array.isArray(tmpl.variables) ? tmpl.variables.join(", ") : "";
+            },
+
+            async deleteTemplate(tmpl) {
+                if (!confirm(`Delete ${tmpl.name}?`)) return;
+                try { 
+                    await fetch(`${this.apiBase}/?id=${tmpl.id}`, { method: "DELETE" }); 
+                    await this.fetchTemplates(); 
+                } catch (e) { alert("Error deleting"); }
+            },
+
+            resetForm() {
+                this.isEditing = false;
+                this.form = { id: '', name: '', type: 'sow', markdown_content: '', version: 1, is_active: true, created_by_id: '' };
+                this.variablesInput = '';
+            },
+
+            getUserName(id) {
+                const user = this.users.find(u => u.id === id);
+                return user ? `${user.first_name} ${user.last_name}` : id;
+            },
+
+            getTypeBadgeColor(type) {
+                switch(type) {
+                    case 'sow': return 'bg-primary';
+                    case 'success_contract': return 'bg-success';
+                    case 'solution_design': return 'bg-info';
+                    default: return 'bg-secondary';
+                }
+            }
+        }
+    }
+</script>
+</body>
+</html>

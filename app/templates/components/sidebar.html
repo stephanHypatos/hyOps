@@ -26,24 +26,25 @@
         <!-- ========================================== -->
         <li class="nav-item">
             <!-- The toggle button. It stays active if any child page is active -->
-            <a class="nav-link {% if current_page in ['organizations', 'users', 'subtypes', 'capabilities','features'] %}active{% endif %}" 
+            <a class="nav-link {% if current_page in ['organizations', 'users', 'subtypes', 'capabilities','features','languages','skills','document_templates','usecases'] %}active{% endif %}" 
                data-bs-toggle="collapse" href="#mainDataMenu" role="button" 
-               aria-expanded="{% if current_page in ['organizations', 'users', 'subtypes', 'capabilities','features'] %}true{% else %}false{% endif %}" 
+               aria-expanded="{% if current_page in ['organizations', 'users', 'subtypes', 'capabilities','features','languages','skills','document_templates','usecases'] %}true{% else %}false{% endif %}" 
                aria-controls="mainDataMenu">
                 🗄️ Master Data
             </a>
             
             <!-- Submenu: Automatically opens if a child is the current_page -->
-            <ul class="collapse {% if current_page in ['organizations', 'users', 'subtypes', 'capabilities','features'] %}show{% endif %} nav flex-column submenu" id="mainDataMenu">
+            <ul class="collapse {% if current_page in ['organizations', 'users', 'subtypes', 'capabilities','features','languages','skills','document_templates','usecases'] %}show{% endif %} nav flex-column submenu" id="mainDataMenu">
                 <li class="nav-item">
                     <a class="nav-link {% if current_page == 'organizations' %}active{% endif %}" href="/">🏢 Organizations</a>
+                </li>
+                 <li class="nav-item">
+                    <a class="nav-link {% if current_page == 'subtypes' %}active{% endif %}" href="/subtypes-page">⚙️ Subtypes</a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link {% if current_page == 'users' %}active{% endif %}" href="/users-page">👥 Users</a>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link {% if current_page == 'subtypes' %}active{% endif %}" href="/subtypes-page">⚙️ Subtypes</a>
-                </li>
+               
                 <li class="nav-item">
                     <a class="nav-link {% if current_page == 'capabilities' %}active{% endif %}" href="/capabilities-page">🧩 Capabilities</a>
                 </li>
@@ -52,6 +53,25 @@
                     <!-- Add this new link -->
                     <a class="nav-link {% if current_page == 'features' %}active{% endif %}" href="/features-page">🛠️ Features</a>
                 </li>
+
+
+                <li class="nav-item">
+                    <a class="nav-link {% if current_page == 'usecases' %}active{% endif %}" href="/usecases-page">🎯 Usecases</a>
+                </li>
+
+
+                <li class="nav-item">
+                    <a class="nav-link {% if current_page == 'languages' %}active{% endif %}" href="/languages-page">🌐 Languages</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_page == 'skills' %}active{% endif %}" href="/skills-page">🛠️ Skills</a>
+                </li>
+
+
+                <li class="nav-item">
+                    <a class="nav-link {% if current_page == 'document_templates' %}active{% endif %}" href="/document-templates-page">📄 Doc Templates</a>
+                </li>
+
             </ul>
         </li>
 
@@ -67,6 +87,8 @@
             </a>
             
             <ul class="collapse {% if current_page in ['projects'] %}show{% endif %} nav flex-column submenu" id="projectsMenu">
+
+                <!-- Inside #projectsMenu ul -->
                 <li class="nav-item">
                     <a class="nav-link {% if current_page == 'projects' %}active{% endif %}" href="/projects-page">🚀 Projects</a>
                 </li>

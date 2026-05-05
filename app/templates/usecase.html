@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usecases</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .sidebar { width: 260px; min-height: 100vh; }
+        .sidebar .nav-link { color: rgba(255, 255, 255, 0.75); border-radius: 5px; margin-bottom: 5px; }
+        .sidebar .nav-link:hover { color: #fff; background-color: rgba(255, 255, 255, 0.1); }
+        .sidebar .nav-link.active { color: #fff; background-color: #0d6efd; }
+        .sidebar .submenu { padding-left: 1rem; }
+        .sidebar .nav-link[data-bs-toggle="collapse"]::after { content: '\25BC'; float: right; font-size: 0.7rem; margin-top: 0.3rem; transition: transform 0.2s ease-in-out; }
+        .sidebar .nav-link[data-bs-toggle="collapse"][aria-expanded="false"]::after { transform: rotate(-90deg); }
+        @media (max-width: 767.98px) { .sidebar { width: 100%; min-height: auto; } }
+    </style>
+</head>
+<body class="bg-light">
+
+<div class="d-flex flex-md-row flex-column" x-data="usecaseManager()" x-init="initData()">
+    {% include "components/sidebar.html" %}
+
+    <main class="flex-grow-1 p-4">
+        
+        <!-- ========================================== -->
+        <!-- VIEW 1: USECASE LIST & FORM               -->
+        <!-- ========================================== -->
+        <div x-show="!selectedUsecase">
+            <h1 class="mb-4">Usecases</h1>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0" x-text="isEditing ? 'Edit Usecase' : 'Add New Usecase'"></h5>
+                </div>
+                <div class="card-body">
+                    <form @submit.prevent="submitForm()">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Usecase Name</label>
+                                <input type="text" class="form-control" x-model="form.name" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Description (Optional)</label>
+                                <input type="text" class="form-control" x-model="form.description" placeholder="Brief description">
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <button type="submit" class="btn" :class="isEditing ? 'btn-warning' : 'btn-primary'" x-text="isEditing ? 'Update Usecase' : 'Create Usecase'"></button>
+                            <button type="button" class="btn btn-secondary" x-show="isEditing" @click="resetForm()">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-header bg-white"><h5 class="mb-0">Usecase List</h5></div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Description</th>
+                                    <th style="width: 200px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr x-show="loading"><td colspan="3" class="text-center text-muted py-4">Loading...</td></tr>
+                                <tr x-show="!loading && usecases.length === 0"><td colspan="3" class="text-center text-muted py-4">No usecases found.</td></tr>
+                                <template x-for="uc in usecases" :key="uc.id">
+                                    <tr>
+                                        <td class="fw-semibold" x-text="uc.name"></td>
+                                        <td x-text="uc.description || '—'"></td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-success" @click="openUsecase(uc)">🛠️ Features</button>
+                                            <button class="btn btn-sm btn-outline-warning" @click="editUsecase(uc)">Edit</button>
+                                            <button class="btn btn-sm btn-outline-danger" @click="deleteUsecase(uc)">Del</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- VIEW 2: FEATURE M2M MANAGEMENT            -->
+        <!-- ========================================== -->
+        <div x-show="selectedUsecase" x-transition>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="mb-0">Features for: <span x-text="selectedUsecase?.name" class="text-primary"></span></h1>
+                <button class="btn btn-outline-secondary" @click="closeUsecase()">← Back to Usecases</button>
+            </div>
+
+            <div class="row">
+                <!-- Add Feature Form -->
+                <div class="col-md-4">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white"><h5 class="mb-0">Assign Feature</h5></div>
+                        <div class="card-body">
+                            <form @submit.prevent="addFeature()">
+                                <div class="mb-3">
+                                    <label class="form-label">Select Feature</label>
+                                    <select class="form-select" x-model="featureForm.feature_id" required>
+                                        <option value="" disabled>Choose Feature...</option>
+                                        <template x-for="f in features" :key="f.id">
+                                            <option :value="f.id" x-text="f.name"></option>
+                                        </template>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">Link to Usecase</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Current Features Table -->
+                <div class="col-md-8">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white"><h5 class="mb-0">Linked Features</h5></div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Feature Name</th>
+                                            <th>Scope Type</th>
+                                            <th style="width: 100px;">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr x-show="loadingFeatures"><td colspan="3" class="text-center text-muted py-4">Loading...</td></tr>
+                                        <tr x-show="!loadingFeatures && linkedFeatures.length === 0"><td colspan="3" class="text-center text-muted py-4">No features linked.</td></tr>
+                                        <template x-for="lf in linkedFeatures" :key="lf.feature_id">
+                                            <tr>
+                                                <td class="fw-semibold" x-text="getFeatureName(lf.feature_id)"></td>
+                                                <td x-text="getFeatureScope(lf.feature_id)"></td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-danger" @click="removeFeature(lf.feature_id)">Unlink</button>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script>
+    function usecaseManager() {
+        return {
+            usecases: [], features: [], loading: true, isEditing: false,
+            form: { id: '', name: '', description: '' },
+            
+            // M2M State
+            selectedUsecase: null,
+            linkedFeatures: [],
+            featureForm: { feature_id: '' },
+            loadingFeatures: false,
+
+            apiBase: "/usecase",
+            featureApi: "/feature",
+
+            async initData() {
+                await this.fetchFeatures(); // Needed for dropdown
+                await this.fetchUsecases();
+            },
+
+            async fetchUsecases() {
+                this.loading = true;
+                try { const res = await fetch(`${this.apiBase}/usecases`); if (!res.ok) throw new Error(); this.usecases = await res.json(); }
+                catch (e) { alert("Error fetching usecases"); } finally { this.loading = false; }
+            },
+
+            async fetchFeatures() {
+                try { const res = await fetch(`${this.featureApi}/features`); if (!res.ok) throw new Error(); this.features = await res.json(); }
+                catch (e) { console.error("Error fetching features"); }
+            },
+
+            async submitForm() {
+                let payload = JSON.parse(JSON.stringify(this.form));
+                try {
+                    if (this.isEditing) {
+                        const id = payload.id; Object.keys(payload).forEach((k) => payload[k] === "" && delete payload[k]);
+                        const res = await fetch(`${this.apiBase}/?id=${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+                        if (!res.ok) throw new Error();
+                    } else {
+                        delete payload.id; if(payload.description === "") delete payload.description;
+                        const res = await fetch(`${this.apiBase}/`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+                        if (!res.ok) throw new Error();
+                    }
+                    this.resetForm(); await this.fetchUsecases();
+                } catch (e) { alert("Error saving usecase"); }
+            },
+
+            editUsecase(uc) { this.isEditing = true; this.form = JSON.parse(JSON.stringify(uc)); },
+
+            async deleteUsecase(uc) {
+                if (!confirm(`Delete ${uc.name}?`)) return;
+                try { await fetch(`${this.apiBase}/?id=${uc.id}`, { method: "DELETE" }); await this.fetchUsecases(); }
+                catch (e) { alert("Error deleting"); }
+            },
+
+            resetForm() { this.isEditing = false; this.form = { id: '', name: '', description: '' }; },
+
+            // ==================== Feature M2M Methods ====================
+            
+            async openUsecase(uc) {
+                this.selectedUsecase = uc;
+                this.featureForm = { feature_id: '' };
+                await this.fetchLinkedFeatures(uc.id);
+            },
+
+            closeUsecase() { this.selectedUsecase = null; this.linkedFeatures = []; },
+
+            async fetchLinkedFeatures(usecaseId) {
+                this.loadingFeatures = true;
+                try {
+                    const res = await fetch(`${this.apiBase}/${usecaseId}/features`);
+                    if (!res.ok) throw new Error();
+                    this.linkedFeatures = await res.json();
+                } catch (e) { alert("Error fetching linked features"); } 
+                finally { this.loadingFeatures = false; }
+            },
+
+            async addFeature() {
+                if (!this.selectedUsecase || !this.featureForm.feature_id) return;
+                try {
+                    const res = await fetch(`${this.apiBase}/${this.selectedUsecase.id}/feature`, {
+                        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(this.featureForm)
+                    });
+                    if (!res.ok) { const err = await res.json(); throw new Error(err.detail || "Error"); }
+                    this.featureForm = { feature_id: '' };
+                    await this.fetchLinkedFeatures(this.selectedUsecase.id);
+                } catch (e) { alert(e.message); }
+            },
+
+            async removeFeature(featureId) {
+                if (!confirm("Unlink this feature?")) return;
+                try {
+                    await fetch(`${this.apiBase}/${this.selectedUsecase.id}/feature/${featureId}`, { method: "DELETE" });
+                    await this.fetchLinkedFeatures(this.selectedUsecase.id);
+                } catch (e) { alert("Error unlinking feature"); }
+            },
+
+            // ==================== Helpers ====================
+            getFeatureName(id) { const f = this.features.find(f => f.id === id); return f ? f.name : id; },
+            getFeatureScope(id) { const f = this.features.find(f => f.id === id); return f ? f.scope_type : '—'; }
+        }
+    }
+</script>
+</body>
+</html>

@@ -1,23 +1,24 @@
 # Dockerfile
 FROM python:3.11-slim
 
-# Set the working directory
+# Set the working directory inside the container
 WORKDIR /app
 
-# Install system dependencies required for building Python packages and PostgreSQL
+# Install system dependencies required for PostgreSQL and building Python packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first to leverage Docker cache
+# Copy requirements first to leverage Docker layer caching
 COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application code
+# Copy the entire root project into the container's /app working directory
+# This brings in the 'app/' folder, so the structure inside is /app/app/main.py
 COPY . .
 
-# Run the application (this will be overridden by docker-compose for --reload)
+# Run the application (overridden by docker-compose for development --reload)
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

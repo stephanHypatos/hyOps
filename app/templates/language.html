@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Languages</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .sidebar { width: 260px; min-height: 100vh; }
+        .sidebar .nav-link { color: rgba(255, 255, 255, 0.75); border-radius: 5px; margin-bottom: 5px; }
+        .sidebar .nav-link:hover { color: #fff; background-color: rgba(255, 255, 255, 0.1); }
+        .sidebar .nav-link.active { color: #fff; background-color: #0d6efd; }
+        .sidebar .submenu { padding-left: 1rem; }
+        .sidebar .nav-link[data-bs-toggle="collapse"]::after { content: '\25BC'; float: right; font-size: 0.7rem; margin-top: 0.3rem; transition: transform 0.2s ease-in-out; }
+        .sidebar .nav-link[data-bs-toggle="collapse"][aria-expanded="false"]::after { transform: rotate(-90deg); }
+        @media (max-width: 767.98px) { .sidebar { width: 100%; min-height: auto; } }
+    </style>
+</head>
+<body class="bg-light">
+
+<div class="d-flex flex-md-row flex-column" x-data="languageManager()" x-init="fetchLanguages()">
+    {% include "components/sidebar.html" %}
+
+    <main class="flex-grow-1 p-4">
+        <h1 class="mb-4">Languages</h1>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0" x-text="isEditing ? 'Edit Language' : 'Add New Language'"></h5>
+            </div>
+            <div class="card-body">
+                <form @submit.prevent="submitForm()">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Language Code (e.g., EN, DE)</label>
+                            <input type="text" class="form-control" x-model="form.code" required maxlength="5">
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label">Language Name (e.g., English)</label>
+                            <input type="text" class="form-control" x-model="form.name" required>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <button type="submit" class="btn" :class="isEditing ? 'btn-warning' : 'btn-primary'" x-text="isEditing ? 'Update Language' : 'Create Language'"></button>
+                        <button type="button" class="btn btn-secondary" x-show="isEditing" @click="resetForm()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-white"><h5 class="mb-0">Language List</h5></div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr><th>Code</th><th>Name</th><th style="width: 150px;">Actions</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr x-show="loading"><td colspan="3" class="text-center text-muted py-4">Loading...</td></tr>
+                            <tr x-show="!loading && languages.length === 0"><td colspan="3" class="text-center text-muted py-4">No languages found.</td></tr>
+                            <template x-for="lang in languages" :key="lang.id">
+                                <tr>
+                                    <td class="fw-semibold" x-text="lang.code"></td>
+                                    <td x-text="lang.name"></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-warning" @click="editLanguage(lang)">Edit</button>
+                                        <button class="btn btn-sm btn-outline-danger" @click="deleteLanguage(lang)">Delete</button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script>
+    function languageManager() {
+        return {
+            languages: [], loading: true, isEditing: false,
+            form: { id: '', code: '', name: '' },
+            apiBase: "/language",
+            async fetchLanguages() {
+                this.loading = true;
+                try { const res = await fetch(`${this.apiBase}/languages`); if (!res.ok) throw new Error(); this.languages = await res.json(); }
+                catch (e) { alert("Error fetching languages"); } finally { this.loading = false; }
+            },
+            async submitForm() {
+                let payload = JSON.parse(JSON.stringify(this.form));
+                try {
+                    if (this.isEditing) {
+                        const id = payload.id; Object.keys(payload).forEach((k) => payload[k] === "" && delete payload[k]);
+                        const res = await fetch(`${this.apiBase}/?id=${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+                        if (!res.ok) throw new Error();
+                    } else {
+                        delete payload.id;
+                        const res = await fetch(`${this.apiBase}/`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+                        if (!res.ok) throw new Error();
+                    }
+                    this.resetForm(); await this.fetchLanguages();
+                } catch (e) { alert("Error saving language"); }
+            },
+            editLanguage(lang) { this.isEditing = true; this.form = JSON.parse(JSON.stringify(lang)); },
+            async deleteLanguage(lang) {
+                if (!confirm(`Delete ${lang.name}?`)) return;
+                try { await fetch(`${this.apiBase}/?id=${lang.id}`, { method: "DELETE" }); await this.fetchLanguages(); }
+                catch (e) { alert("Error deleting"); }
+            },
+            resetForm() { this.isEditing = false; this.form = { id: '', code: '', name: '' }; }
+        }
+    }
+</script>
+</body>
+</html>

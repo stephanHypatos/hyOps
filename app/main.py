@@ -68,6 +68,29 @@ async def serve_features_page(request: Request):
 
 
 
+@app.get("/usecases-page",response_class=HTMLResponse,include_in_schema=False)
+async def serve_usecases_page(request: Request):
+    return templates.TemplateResponse(request=request,name="usecase.html", context={"request": request, "current_page": "usecases"})
+
+
+# Serve HTML Routes
+@app.get("/languages-page",response_class=HTMLResponse,include_in_schema=False)
+async def serve_languages_page(request: Request):
+    return templates.TemplateResponse(request=request,name="language.html",context= {"request": request, "current_page": "languages"})
+
+@app.get("/skills-page",response_class=HTMLResponse,include_in_schema=False)
+async def serve_skills_page(request: Request):
+    return templates.TemplateResponse(request=request,name="skill.html",context= {"request": request, "current_page": "skills"})
+
+
+@app.get("/document-templates-page",response_class=HTMLResponse,include_in_schema=False)
+async def serve_document_templates_page(request: Request):
+    return templates.TemplateResponse(request=request,name="document_template.html", context={"request": request, "current_page": "document_templates"})
+
+@app.get("/projects-page",response_class=HTMLResponse,include_in_schema=False)
+async def serve_projects_page(request: Request):
+    return templates.TemplateResponse(request=request,name="project.html", context={"request": request, "current_page": "projects"})
+
 
 @app.get("/scalar",include_in_schema=False)
 async def get_scalar_docs():

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skills</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .sidebar { width: 260px; min-height: 100vh; }
+        .sidebar .nav-link { color: rgba(255, 255, 255, 0.75); border-radius: 5px; margin-bottom: 5px; }
+        .sidebar .nav-link:hover { color: #fff; background-color: rgba(255, 255, 255, 0.1); }
+        .sidebar .nav-link.active { color: #fff; background-color: #0d6efd; }
+        .sidebar .submenu { padding-left: 1rem; }
+        .sidebar .nav-link[data-bs-toggle="collapse"]::after { content: '\25BC'; float: right; font-size: 0.7rem; margin-top: 0.3rem; transition: transform 0.2s ease-in-out; }
+        .sidebar .nav-link[data-bs-toggle="collapse"][aria-expanded="false"]::after { transform: rotate(-90deg); }
+        @media (max-width: 767.98px) { .sidebar { width: 100%; min-height: auto; } }
+    </style>
+</head>
+<body class="bg-light">
+
+<div class="d-flex flex-md-row flex-column" x-data="skillManager()" x-init="fetchSkills()">
+    {% include "components/sidebar.html" %}
+
+    <main class="flex-grow-1 p-4">
+        <h1 class="mb-4">Skills</h1>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0" x-text="isEditing ? 'Edit Skill' : 'Add New Skill'"></h5>
+            </div>
+            <div class="card-body">
+                <form @submit.prevent="submitForm()">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Skill Name</label>
+                            <input type="text" class="form-control" x-model="form.name" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Category (Optional)</label>
+                            <input type="text" class="form-control" x-model="form.category" placeholder="e.g., Technical, Soft Skill">
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <button type="submit" class="btn" :class="isEditing ? 'btn-warning' : 'btn-primary'" x-text="isEditing ? 'Update Skill' : 'Create Skill'"></button>
+                        <button type="button" class="btn btn-secondary" x-show="isEditing" @click="resetForm()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-white"><h5 class="mb-0">Skill List</h5></div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr><th>Name</th><th>Category</th><th style="width: 150px;">Actions</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr x-show="loading"><td colspan="3" class="text-center text-muted py-4">Loading...</td></tr>
+                            <tr x-show="!loading && skills.length === 0"><td colspan="3" class="text-center text-muted py-4">No skills found.</td></tr>
+                            <template x-for="skill in skills" :key="skill.id">
+                                <tr>
+                                    <td class="fw-semibold" x-text="skill.name"></td>
+                                    <td x-text="skill.category || '—'"></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-warning" @click="editSkill(skill)">Edit</button>
+                                        <button class="btn btn-sm btn-outline-danger" @click="deleteSkill(skill)">Delete</button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script>
+    function skillManager() {
+        return {
+            skills: [], loading: true, isEditing: false,
+            form: { id: '', name: '', category: '' },
+            apiBase: "/skill",
+            async fetchSkills() {
+                this.loading = true;
+                try { const res = await fetch(`${this.apiBase}/skills`); if (!res.ok) throw new Error(); this.skills = await res.json(); }
+                catch (e) { alert("Error fetching skills"); } finally { this.loading = false; }
+            },
+            async submitForm() {
+                let payload = JSON.parse(JSON.stringify(this.form));
+                try {
+                    if (this.isEditing) {
+                        const id = payload.id; Object.keys(payload).forEach((k) => payload[k] === "" && delete payload[k]);
+                        const res = await fetch(`${this.apiBase}/?id=${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+                        if (!res.ok) throw new Error();
+                    } else {
+                        delete payload.id; if(payload.category === "") delete payload.category;
+                        const res = await fetch(`${this.apiBase}/`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+                        if (!res.ok) throw new Error();
+                    }
+                    this.resetForm(); await this.fetchSkills();
+                } catch (e) { alert("Error saving skill"); }
+            },
+            editSkill(skill) { this.isEditing = true; this.form = JSON.parse(JSON.stringify(skill)); },
+            async deleteSkill(skill) {
+                if (!confirm(`Delete ${skill.name}?`)) return;
+                try { await fetch(`${this.apiBase}/?id=${skill.id}`, { method: "DELETE" }); await this.fetchSkills(); }
+                catch (e) { alert("Error deleting"); }
+            },
+            resetForm() { this.isEditing = false; this.form = { id: '', name: '', category: '' }; }
+        }
+    }
+</script>
+</body>
+</html>

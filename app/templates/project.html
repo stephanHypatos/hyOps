@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Projects</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .sidebar { width: 260px; min-height: 100vh; }
+        .sidebar .nav-link { color: rgba(255, 255, 255, 0.75); border-radius: 5px; margin-bottom: 5px; }
+        .sidebar .nav-link:hover { color: #fff; background-color: rgba(255, 255, 255, 0.1); }
+        .sidebar .nav-link.active { color: #fff; background-color: #0d6efd; }
+        .sidebar .submenu { padding-left: 1rem; }
+        .sidebar .nav-link[data-bs-toggle="collapse"]::after { content: '\25BC'; float: right; font-size: 0.7rem; margin-top: 0.3rem; transition: transform 0.2s ease-in-out; }
+        .sidebar .nav-link[data-bs-toggle="collapse"][aria-expanded="false"]::after { transform: rotate(-90deg); }
+        @media (max-width: 767.98px) { .sidebar { width: 100%; min-height: auto; } }
+    </style>
+</head>
+<body class="bg-light">
+
+<div class="d-flex flex-md-row flex-column" x-data="projectManager()" x-init="initData()">
+    {% include "components/sidebar.html" %}
+
+    <main class="flex-grow-1 p-4">
+        
+        <!-- ========================================== -->
+        <!-- VIEW 1: PROJECT LIST & FORM               -->
+        <!-- ========================================== -->
+        <div x-show="!selectedProject">
+            <h1 class="mb-4">Projects</h1>
+
+            <!-- Project Form Card -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0" x-text="isEditing ? 'Edit Project' : 'Add New Project'"></h5>
+                </div>
+                <div class="card-body">
+                    <form @submit.prevent="submitForm()">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Project Name</label>
+                                <input type="text" class="form-control" x-model="form.name" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Project Type</label>
+                                <select class="form-select" x-model="form.type" required>
+                                    <option value="pilot">Pilot</option>
+                                    <option value="poc">POC</option>
+                                    <option value="custom_demo">Custom Demo</option>
+                                    <option value="rollout">Rollout</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Start Date</label>
+                                <input type="date" class="form-control" x-model="form.start_date" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Duration (Weeks)</label>
+                                <input type="number" class="form-control" x-model="form.default_duration_weeks" required min="1">
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Customer (Organization)</label>
+                                <select class="form-select" x-model="form.customer_id" required>
+                                    <option value="" disabled>Select Customer...</option>
+                                    <template x-for="org in organizations" :key="org.id">
+                                        <option :value="org.id" x-text="org.name"></option>
+                                    </template>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Deal Winner (User)</label>
+                                <select class="form-select" x-model="form.deal_winner_id" required>
+                                    <option value="" disabled>Select User...</option>
+                                    <template x-for="u in users" :key="u.id">
+                                        <option :value="u.id" x-text="u.first_name + ' ' + u.last_name"></option>
+                                    </template>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3 border rounded p-3 pt-1">
+                            <div class="col-md-3">
+                                <div class="form-check form-switch mt-md-4">
+                                    <input class="form-check-input" type="checkbox" x-model="form.requires_integration" id="intSwitch">
+                                    <label class="form-check-label" for="intSwitch">Requires Integration</label>
+                                </div>
+                            </div>
+                            <div class="col-md-9" x-show="form.requires_integration" x-transition>
+                                <label class="form-label">Integration Type</label>
+                                <select class="form-select" x-model="form.integration_type" :required="form.requires_integration">
+                                    <option value="sap_addon">SAP Addon</option>
+                                    <option value="sap_cloud_connector">SAP Cloud Connector</option>
+                                    <option value="coupa_connector">Coupa Connector</option>
+                                    <option value="boomi">Boomi</option>
+                                    <option value="custom_middleware">Custom Middleware</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Partner Budget (Hours)</label>
+                                <input type="number" step="0.5" class="form-control" x-model="form.partner_budget_hours" required min="0">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Internal Budget (Hours)</label>
+                                <input type="number" step="0.5" class="form-control" x-model="form.internal_budget_hours" required min="0">
+                            </div>
+                        </div>
+
+                        <div class="mt-2">
+                            <button type="submit" class="btn" :class="isEditing ? 'btn-warning' : 'btn-primary'" x-text="isEditing ? 'Update Project' : 'Create Project'"></button>
+                            <button type="button" class="btn btn-secondary" x-show="isEditing" @click="resetForm()">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Project Table Card -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-white"><h5 class="mb-0">Project List</h5></div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Customer</th>
+                                    <th>Type</th>
+                                    <th>Start Date</th>
+                                    <th>Integration</th>
+                                    <th style="width: 200px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr x-show="loading"><td colspan="6" class="text-center text-muted py-4">Loading...</td></tr>
+                                <tr x-show="!loading && projects.length === 0"><td colspan="6" class="text-center text-muted py-4">No projects found.</td></tr>
+                                <template x-for="proj in projects" :key="proj.id">
+                                    <tr>
+                                        <td class="fw-semibold" x-text="proj.name"></td>
+                                        <td x-text="getOrgName(proj.customer_id)"></td>
+                                        <td><span class="badge text-capitalize bg-info" x-text="proj.type.replace('_', ' ')"></span></td>
+                                        <td x-text="proj.start_date"></td>
+                                        <td>
+                                            <span x-show="proj.requires_integration" class="badge bg-warning text-dark text-capitalize" x-text="proj.integration_type.replace('_', ' ')"></span>
+                                            <span x-show="!proj.requires_integration" class="text-muted">None</span>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-success" @click="openProject(proj)">👥 Stakeholders</button>
+                                            <button class="btn btn-sm btn-outline-warning" @click="editProject(proj)">Edit</button>
+                                            <button class="btn btn-sm btn-outline-danger" @click="deleteProject(proj)">Del</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- VIEW 2: STAKEHOLDER MANAGEMENT            -->
+        <!-- ========================================== -->
+        <div x-show="selectedProject" x-transition>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="mb-0">Stakeholders: <span x-text="selectedProject?.name" class="text-primary"></span></h1>
+                <button class="btn btn-outline-secondary" @click="closeProject()">← Back to Projects</button>
+            </div>
+
+            <div class="row">
+                <!-- Add Stakeholder Form -->
+                <div class="col-md-4">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white"><h5 class="mb-0">Add Stakeholder</h5></div>
+                        <div class="card-body">
+                            <form @submit.prevent="addStakeholder()">
+                                <div class="mb-3">
+                                    <label class="form-label">Select User</label>
+                                    <select class="form-select" x-model="stakeholderForm.user_id" required>
+                                        <option value="" disabled>Choose User...</option>
+                                        <template x-for="u in users" :key="u.id">
+                                            <option :value="u.id" x-text="u.first_name + ' ' + u.last_name"></option>
+                                        </template>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Role (Optional)</label>
+                                    <input type="text" class="form-control" x-model="stakeholderForm.role" placeholder="e.g., Project Manager">
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">Assign to Project</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Current Stakeholders Table -->
+                <div class="col-md-8">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white"><h5 class="mb-0">Current Stakeholders</h5></div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>User Name</th>
+                                            <th>Role</th>
+                                            <th style="width: 100px;">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr x-show="loadingStakeholders"><td colspan="3" class="text-center text-muted py-4">Loading...</td></tr>
+                                        <tr x-show="!loadingStakeholders && stakeholders.length === 0"><td colspan="3" class="text-center text-muted py-4">No stakeholders assigned.</td></tr>
+                                        <template x-for="sh in stakeholders" :key="sh.user_id">
+                                            <tr>
+                                                <td class="fw-semibold" x-text="getUserName(sh.user_id)"></td>
+                                                <td x-text="sh.role || '—'"></td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-danger" @click="removeStakeholder(sh.user_id)">Remove</button>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script>
+    function projectManager() {
+        return {
+            projects: [], organizations: [], users: [], loading: true, isEditing: false,
+            form: { id: '', name: '', type: 'pilot', start_date: '', customer_id: '', deal_winner_id: '', default_duration_weeks: 4, requires_integration: false, integration_type: 'none', partner_budget_hours: 0, internal_budget_hours: 0 },
+            
+            // Stakeholder state
+            selectedProject: null,
+            stakeholders: [],
+            stakeholderForm: { user_id: '', role: '' },
+            loadingStakeholders: false,
+
+            apiBase: "/project",
+            orgApi: "/organization",
+            userApi: "/user",
+
+            async initData() {
+                await Promise.all([this.fetchOrganizations(), this.fetchUsers()]);
+                await this.fetchProjects();
+            },
+
+            async fetchProjects() {
+                this.loading = true;
+                try { const res = await fetch(`${this.apiBase}/projects`); if (!res.ok) throw new Error(); this.projects = await res.json(); }
+                catch (e) { alert("Error fetching projects"); } finally { this.loading = false; }
+            },
+
+            async fetchOrganizations() {
+                try { const res = await fetch(`${this.orgApi}/organizations`); if (!res.ok) throw new Error(); this.organizations = await res.json(); } catch (e) {}
+            },
+
+            async fetchUsers() {
+                try { const res = await fetch(`${this.userApi}/users`); if (!res.ok) throw new Error(); this.users = await res.json(); } catch (e) {}
+            },
+
+            async submitForm() {
+                let payload = JSON.parse(JSON.stringify(this.form));
+                if (!payload.requires_integration) payload.integration_type = "none";
+
+                try {
+                    if (this.isEditing) {
+                        const id = payload.id;
+                        Object.keys(payload).forEach((k) => { if (payload[k] === "" || payload[k] === null) delete payload[k]; });
+                        const res = await fetch(`${this.apiBase}/?id=${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+                        if (!res.ok) throw new Error();
+                    } else {
+                        delete payload.id;
+                        const res = await fetch(`${this.apiBase}/`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+                        if (!res.ok) throw new Error();
+                    }
+                    this.resetForm(); await this.fetchProjects();
+                } catch (e) { alert("Error saving project"); }
+            },
+
+            editProject(proj) {
+                this.isEditing = true;
+                let editData = JSON.parse(JSON.stringify(proj));
+                if (editData.start_date && editData.start_date.length > 10) editData.start_date = editData.start_date.substring(0, 10);
+                this.form = editData;
+            },
+
+            async deleteProject(proj) {
+                if (!confirm(`Delete ${proj.name}?`)) return;
+                try { await fetch(`${this.apiBase}/?id=${proj.id}`, { method: "DELETE" }); await this.fetchProjects(); }
+                catch (e) { alert("Error deleting"); }
+            },
+
+            resetForm() {
+                this.isEditing = false;
+                this.form = { id: '', name: '', type: 'pilot', start_date: '', customer_id: '', deal_winner_id: '', default_duration_weeks: 4, requires_integration: false, integration_type: 'none', partner_budget_hours: 0, internal_budget_hours: 0 };
+            },
+
+            // ==================== Stakeholder Methods ====================
+            
+            async openProject(proj) {
+                this.selectedProject = proj;
+                this.stakeholderForm = { user_id: '', role: '' };
+                await this.fetchStakeholders(proj.id);
+            },
+
+            closeProject() {
+                this.selectedProject = null;
+                this.stakeholders = [];
+            },
+
+            async fetchStakeholders(projectId) {
+                this.loadingStakeholders = true;
+                try {
+                    const res = await fetch(`${this.apiBase}/${projectId}/stakeholders`);
+                    if (!res.ok) throw new Error();
+                    this.stakeholders = await res.json();
+                } catch (e) { alert("Error fetching stakeholders"); } 
+                finally { this.loadingStakeholders = false; }
+            },
+
+            async addStakeholder() {
+                if (!this.selectedProject || !this.stakeholderForm.user_id) return;
+                try {
+                    const res = await fetch(`${this.apiBase}/${this.selectedProject.id}/stakeholder`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(this.stakeholderForm)
+                    });
+                    if (!res.ok) {
+                        const err = await res.json();
+                        throw new Error(err.detail || "Error assigning stakeholder");
+                    }
+                    this.stakeholderForm = { user_id: '', role: '' }; // Reset form
+                    await this.fetchStakeholders(this.selectedProject.id); // Refresh list
+                } catch (e) { alert(e.message); }
+            },
+
+            async removeStakeholder(userId) {
+                if (!confirm("Remove this stakeholder from the project?")) return;
+                try {
+                    const res = await fetch(`${this.apiBase}/${this.selectedProject.id}/stakeholder/${userId}`, { method: "DELETE" });
+                    if (!res.ok) throw new Error();
+                    await this.fetchStakeholders(this.selectedProject.id); // Refresh list
+                } catch (e) { alert("Error removing stakeholder"); }
+            },
+
+            // ==================== Helpers ====================
+            getOrgName(id) { const org = this.organizations.find(o => o.id === id); return org ? org.name : id; },
+            getUserName(id) { const user = this.users.find(u => u.id === id); return user ? `${user.first_name} ${user.last_name}` : id; }
+        }
+    }
+</script>
+</body>
+</html>
