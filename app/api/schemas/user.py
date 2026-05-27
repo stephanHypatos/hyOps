@@ -1,4 +1,3 @@
-
 from typing import Optional
 from pydantic import EmailStr, BaseModel
 from sqlmodel import SQLModel, select

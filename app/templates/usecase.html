@@ -5,15 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Usecases</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
-        .sidebar { width: 260px; min-height: 100vh; }
+        .sidebar { width: 260px; min-width: 260px; min-height: 100vh; flex-shrink: 0; }
         .sidebar .nav-link { color: rgba(255, 255, 255, 0.75); border-radius: 5px; margin-bottom: 5px; }
         .sidebar .nav-link:hover { color: #fff; background-color: rgba(255, 255, 255, 0.1); }
         .sidebar .nav-link.active { color: #fff; background-color: #0d6efd; }
         .sidebar .submenu { padding-left: 1rem; }
         .sidebar .nav-link[data-bs-toggle="collapse"]::after { content: '\25BC'; float: right; font-size: 0.7rem; margin-top: 0.3rem; transition: transform 0.2s ease-in-out; }
         .sidebar .nav-link[data-bs-toggle="collapse"][aria-expanded="false"]::after { transform: rotate(-90deg); }
-        @media (max-width: 767.98px) { .sidebar { width: 100%; min-height: auto; } }
+        @media (max-width: 767.98px) { .sidebar { width: 100%; min-width: 100%; min-height: auto; } }
+        .feature-card { border-left: 3px solid; transition: transform 0.1s ease; }
+        .feature-card:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
     </style>
 </head>
 <body class="bg-light">
@@ -98,7 +101,7 @@
             <div class="row">
                 <!-- Add Feature Form -->
                 <div class="col-md-4">
-                    <div class="card shadow-sm">
+                    <div class="card shadow-sm mb-3">
                         <div class="card-header bg-white"><h5 class="mb-0">Assign Feature</h5></div>
                         <div class="card-body">
                             <form @submit.prevent="addFeature()">
@@ -115,31 +118,69 @@
                             </form>
                         </div>
                     </div>
+
+                    <!-- 🆕 Summary Stats -->
+                    <div class="card shadow-sm" x-show="linkedFeatures.length > 0">
+                        <div class="card-header bg-white"><h6 class="mb-0">Summary</h6></div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted">Total Features</span>
+                                <strong x-text="linkedFeatures.length"></strong>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted">Active</span>
+                                <strong class="text-success" x-text="linkedFeatures.filter(f => f.active).length"></strong>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">With Requirements</span>
+                                <strong class="text-primary" x-text="linkedFeatures.filter(f => f.requirements && f.requirements.length > 0).length"></strong>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Current Features Table -->
+                <!-- 🔄 UPDATED: Current Features - now uses inline data from enriched response -->
                 <div class="col-md-8">
                     <div class="card shadow-sm">
-                        <div class="card-header bg-white"><h5 class="mb-0">Linked Features</h5></div>
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Linked Features</h5>
+                            <span class="badge bg-secondary" x-text="linkedFeatures.length + ' features'"></span>
+                        </div>
                         <div class="card-body p-0">
                             <div class="table-responsive">
                                 <table class="table table-hover align-middle mb-0">
                                     <thead class="table-light">
                                         <tr>
                                             <th>Feature Name</th>
-                                            <th>Scope Type</th>
+                                            <th>Capability</th>
+                                            <th>Scope</th>
+                                            <th>Status</th>
+                                            <th>Reqs</th>
                                             <th style="width: 100px;">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr x-show="loadingFeatures"><td colspan="3" class="text-center text-muted py-4">Loading...</td></tr>
-                                        <tr x-show="!loadingFeatures && linkedFeatures.length === 0"><td colspan="3" class="text-center text-muted py-4">No features linked.</td></tr>
-                                        <template x-for="lf in linkedFeatures" :key="lf.feature_id">
+                                        <tr x-show="loadingFeatures"><td colspan="6" class="text-center text-muted py-4">Loading...</td></tr>
+                                        <tr x-show="!loadingFeatures && linkedFeatures.length === 0"><td colspan="6" class="text-center text-muted py-4">No features linked.</td></tr>
+                                        <template x-for="lf in linkedFeatures" :key="lf.id">
                                             <tr>
-                                                <td class="fw-semibold" x-text="getFeatureName(lf.feature_id)"></td>
-                                                <td x-text="getFeatureScope(lf.feature_id)"></td>
                                                 <td>
-                                                    <button class="btn btn-sm btn-outline-danger" @click="removeFeature(lf.feature_id)">Unlink</button>
+                                                    <div class="fw-semibold" x-text="lf.name"></div>
+                                                    <div class="small text-muted text-truncate" style="max-width: 250px;" x-text="lf.service_description" x-show="lf.service_description"></div>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-info text-capitalize" x-text="lf.capability_contract ? lf.capability_contract.replace(/_/g, ' ') : '—'"></span>
+                                                    <div class="small text-muted mt-1" x-text="lf.capability_name" x-show="lf.capability_name"></div>
+                                                </td>
+                                                <td><span class="badge bg-secondary text-capitalize" x-text="lf.scope_type ? lf.scope_type.replace(/_/g, ' ') : '—'"></span></td>
+                                                <td>
+                                                    <span class="badge" :class="lf.active ? 'bg-success' : 'bg-secondary'" x-text="lf.active ? 'Active' : 'Inactive'"></span>
+                                                </td>
+                                                <td>
+                                                    <span class="badge" :class="(lf.requirements && lf.requirements.length > 0) ? 'bg-primary' : 'bg-light text-dark'" x-text="lf.requirements ? lf.requirements.length : 0"></span>
+                                                </td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-danger" @click="removeFeature(lf.id)">Unlink</button>
                                                 </td>
                                             </tr>
                                         </template>
@@ -173,7 +214,7 @@
             featureApi: "/feature",
 
             async initData() {
-                await this.fetchFeatures(); // Needed for dropdown
+                await this.fetchFeatures();
                 await this.fetchUsecases();
             },
 
@@ -252,11 +293,7 @@
                     await fetch(`${this.apiBase}/${this.selectedUsecase.id}/feature/${featureId}`, { method: "DELETE" });
                     await this.fetchLinkedFeatures(this.selectedUsecase.id);
                 } catch (e) { alert("Error unlinking feature"); }
-            },
-
-            // ==================== Helpers ====================
-            getFeatureName(id) { const f = this.features.find(f => f.id === id); return f ? f.name : id; },
-            getFeatureScope(id) { const f = this.features.find(f => f.id === id); return f ? f.scope_type : '—'; }
+            }
         }
     }
 </script>

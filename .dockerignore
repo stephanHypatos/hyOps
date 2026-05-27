@@ -4,3 +4,7 @@ __pycache__/
 *$py.class
 
 venv/
+migrations
+alembic.ini\
+.env
+.env.sample

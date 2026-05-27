@@ -20,6 +20,11 @@ engine = create_async_engine(
 async def create_db_tables():
     async with engine.begin() as connection:
         from .models import Organization, User
+         
+        # 1. DROP ALL TABLES (This wipes the database schema)
+        # await connection.run_sync(SQLModel.metadata.drop_all)
+        
+        # 2. CREATE ALL TABLES (This rebuilds them with your new models)
         await connection.run_sync(SQLModel.metadata.create_all)
 
 

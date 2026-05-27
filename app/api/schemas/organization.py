@@ -4,27 +4,6 @@ from datetime import datetime
 from uuid import UUID
 from typing import Optional
 
-# class BaseShipment(BaseModel):
-#     content: str
-#     weight: float = Field(le=25)
-#     destination: int
-
-
-# class ShipmentRead(BaseShipment):
-#     id: UUID
-#     status: ShipmentStatus
-#     estimated_delivery: datetime
-
-
-# class ShipmentCreate(BaseShipment):
-#     pass
-
-
-# class ShipmentUpdate(BaseModel):
-#     status: ShipmentStatus | None = Field(default=None)
-#     estimated_delivery: datetime | None = Field(default=None)
-
-
 
 class OrganizationBase(BaseModel):
     name: str
@@ -32,6 +11,10 @@ class OrganizationBase(BaseModel):
     email: EmailStr
     industry: str
     country: str
+    regions_operation: Optional[str] = None
+    number_subsidiaries: Optional[str] = None
+    company_overview: Optional[str] = None
+    languages: Optional[str] = None
 
 
 class OrganizationCreate(OrganizationBase):
@@ -44,9 +27,20 @@ class OrganizationUpdate(BaseModel):
     email: Optional[EmailStr] = None
     industry: Optional[str] = None
     country: Optional[str] = None
+    regions_operation: Optional[str] = None
+    number_subsidiaries: Optional[str] = None
+    company_overview: Optional[str] = None
+    languages: Optional[str] = None
 
 
 class OrganizationRead(OrganizationBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
+
+    # Override inherited Optional fields so response always shows them
+    # (they'll be None if not set, which is valid JSON)
+    regions_operation: Optional[str] = None
+    number_subsidiaries: Optional[str] = None
+    company_overview: Optional[str] = None
+    languages: Optional[str] = None

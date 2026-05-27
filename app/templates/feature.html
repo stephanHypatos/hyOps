@@ -4,31 +4,40 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Feature Manager</title>
-    <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
-        .sidebar { width: 260px; min-height: 100vh; }
+        .sidebar { width: 260px; min-width: 260px; min-height: 100vh; flex-shrink: 0; }
         .sidebar .nav-link { color: rgba(255, 255, 255, 0.75); border-radius: 5px; margin-bottom: 5px; }
         .sidebar .nav-link:hover { color: #fff; background-color: rgba(255, 255, 255, 0.1); }
         .sidebar .nav-link.active { color: #fff; background-color: #0d6efd; }
         .sidebar .submenu { padding-left: 1rem; }
         .sidebar .nav-link[data-bs-toggle="collapse"]::after { content: '\25BC'; float: right; font-size: 0.7rem; margin-top: 0.3rem; transition: transform 0.2s ease-in-out; }
         .sidebar .nav-link[data-bs-toggle="collapse"][aria-expanded="false"]::after { transform: rotate(-90deg); }
-        @media (max-width: 767.98px) { .sidebar { width: 100%; min-height: auto; } }
-        
-        /* Custom style for text areas in the form */
+        @media (max-width: 767.98px) { .sidebar { width: 100%; min-width: 100%; min-height: auto; } }
         .form-control, .form-select { font-size: 0.9rem; }
+        .req-item { 
+            border: 1px solid #dee2e6; 
+            border-radius: 6px; 
+            padding: 10px 12px; 
+            margin-bottom: 8px; 
+            background: #f8f9fa;
+            position: relative;
+        }
+        .req-item:hover { background: #e9ecef; }
+        .req-item .btn-remove-req {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+        }
     </style>
 </head>
 <body class="bg-light">
 
-<!-- Alpine.js Root Component -->
 <div class="d-flex flex-md-row flex-column" x-data="featureManager()" x-init="initData()">
     
-    <!-- Jinja2 Sidebar Include -->
     {% include "components/sidebar.html" %}
 
-    <!-- Main Content Area -->
     <main class="flex-grow-1 p-4">
         <h1 class="mb-4">Features</h1>
 
@@ -136,6 +145,45 @@
                         </div>
                     </div>
 
+                    <!-- 🆕 Row 5: Structured Requirements (JSONB) -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label mb-0">
+                                    Requirements 
+                                    <span class="badge bg-primary ms-1" x-text="form.requirements.length" x-show="form.requirements.length > 0"></span>
+                                </label>
+                                <button type="button" class="btn btn-sm btn-outline-primary" @click="addRequirement()">
+                                    <i class="bi bi-plus-lg"></i> Add Requirement
+                                </button>
+                            </div>
+                            <div class="text-muted small mb-2" x-show="form.requirements.length === 0">
+                                No structured requirements added. These will appear as tables in the Solution Design Document.
+                            </div>
+                            <template x-for="(req, i) in form.requirements" :key="i">
+                                <div class="req-item">
+                                    <button type="button" class="btn btn-sm btn-outline-danger btn-remove-req" @click="removeRequirement(i)">
+                                        <i class="bi bi-x-lg"></i>
+                                    </button>
+                                    <div class="row g-2">
+                                        <div class="col-md-12">
+                                            <label class="form-label small fw-bold">Requirement</label>
+                                            <input type="text" class="form-control form-control-sm" x-model="req.requirement" placeholder="e.g., Extract vendor name from invoice">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label small fw-bold">Description</label>
+                                            <input type="text" class="form-control form-control-sm" x-model="req.description" placeholder="Detailed description of the requirement">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label small fw-bold">Solution</label>
+                                            <input type="text" class="form-control form-control-sm" x-model="req.solution" placeholder="How this requirement is addressed">
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
                     <div class="mt-2">
                         <button type="submit" class="btn" :class="isEditing ? 'btn-warning' : 'btn-primary'" x-text="isEditing ? 'Update Feature' : 'Create Feature'"></button>
                         <button type="button" class="btn btn-secondary" x-show="isEditing" @click="resetForm()">Cancel</button>
@@ -159,15 +207,16 @@
                                 <th>Owner</th>
                                 <th>Scope</th>
                                 <th>Status</th>
+                                <th>Reqs</th>
                                 <th style="width: 150px;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr x-show="loading">
-                                <td colspan="6" class="text-center text-muted py-4">Loading features...</td>
+                                <td colspan="7" class="text-center text-muted py-4">Loading features...</td>
                             </tr>
                             <tr x-show="!loading && features.length === 0">
-                                <td colspan="6" class="text-center text-muted py-4">No features found.</td>
+                                <td colspan="7" class="text-center text-muted py-4">No features found.</td>
                             </tr>
                             
                             <template x-for="feat in features" :key="feat.id">
@@ -180,6 +229,10 @@
                                     </td>
                                     <td>
                                         <span class="badge" :class="feat.active ? 'bg-primary' : 'bg-secondary'" x-text="feat.active ? 'Active' : 'Inactive'"></span>
+                                    </td>
+                                    <!-- 🆕 Requirements count -->
+                                    <td>
+                                        <span class="badge" :class="(feat.requirements && feat.requirements.length > 0) ? 'bg-info' : 'bg-light text-dark'" x-text="feat.requirements ? feat.requirements.length : 0"></span>
                                     </td>
                                     <td>
                                         <button class="btn btn-sm btn-outline-warning" @click="editFeature(feat)">Edit</button>
@@ -196,9 +249,7 @@
     </main>
 </div>
 
-<!-- Bootstrap 5 JS Bundle -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<!-- Alpine.js -->
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
 <script>
@@ -225,7 +276,8 @@
                 included_in_ootb: false,
                 default_enabled: false,
                 active: true,
-                multiple_value: 0
+                multiple_value: 0,
+                requirements: []  // 🆕 JSONB array of {requirement, description, solution}
             },
 
             // API Base URLs
@@ -272,9 +324,30 @@
                 } catch (error) { console.error(error); }
             },
 
+            // 🆕 Requirement management methods
+            addRequirement() {
+                this.form.requirements.push({
+                    requirement: '',
+                    description: '',
+                    solution: ''
+                });
+            },
+            removeRequirement(index) {
+                this.form.requirements.splice(index, 1);
+            },
+
             // Handle Create or Update
             async submitForm() {
                 let payload = JSON.parse(JSON.stringify(this.form));
+                
+                // 🆕 Clean up empty requirement entries before sending
+                if (Array.isArray(payload.requirements)) {
+                    payload.requirements = payload.requirements.filter(r => r.requirement && r.requirement.trim() !== '');
+                }
+                // Ensure requirements is always an array
+                if (!Array.isArray(payload.requirements)) {
+                    payload.requirements = [];
+                }
                 
                 try {
                     if (this.isEditing) {
@@ -282,13 +355,18 @@
                         Object.keys(payload).forEach((k) => {
                             if (payload[k] === "" || payload[k] === null) delete payload[k];
                         });
+                        // Don't delete empty requirements array — explicitly send it
+                        if (!payload.requirements) payload.requirements = [];
                         
                         const response = await fetch(`${this.featureApi}/?id=${id}`, {
                             method: "PATCH",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify(payload)
                         });
-                        if (!response.ok) throw new Error("Failed to update feature");
+                        if (!response.ok) {
+                            const err = await response.json();
+                            throw new Error(err.detail || "Failed to update feature");
+                        }
                     } else {
                         delete payload.id;
                         if (payload.reference_documentation === "") delete payload.reference_documentation;
@@ -298,21 +376,27 @@
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify(payload)
                         });
-                        if (!response.ok) throw new Error("Failed to create feature");
+                        if (!response.ok) {
+                            const err = await response.json();
+                            throw new Error(err.detail || "Failed to create feature");
+                        }
                     }
 
                     this.resetForm();
                     await this.fetchFeatures(); 
                 } catch (error) {
                     console.error(error);
-                    alert("Error saving feature.");
+                    alert("Error saving feature: " + error.message);
                 }
             },
 
             // Populate form for editing
             editFeature(feat) {
                 this.isEditing = true;
-                this.form = JSON.parse(JSON.stringify(feat));
+                let editData = JSON.parse(JSON.stringify(feat));
+                // 🆕 Ensure requirements is an array when editing
+                editData.requirements = Array.isArray(editData.requirements) ? editData.requirements : [];
+                this.form = editData;
             },
 
             // Delete feature
@@ -346,7 +430,8 @@
                     included_in_ootb: false,
                     default_enabled: false,
                     active: true,
-                    multiple_value: 0
+                    multiple_value: 0,
+                    requirements: []  // 🆕
                 };
             },
 

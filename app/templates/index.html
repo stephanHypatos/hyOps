@@ -10,6 +10,8 @@
         /* Custom styles for the sidebar */
         .sidebar {
             width: 260px;
+            flex-basis: 260px;   /* Sets the initial main size to 260px */
+            flex-shrink: 0;      /* PREVENTS the sidebar from squeezing */
             min-height: 100vh;
         }
         
@@ -28,10 +30,30 @@
             color: #fff;
             background-color: #0d6efd;
         }
+
+        .lang-badge {
+            display: inline-block;
+            font-size: 0.75rem;
+            padding: 0.2em 0.55em;
+            margin: 1px 2px;
+            border-radius: 0.375rem;
+            background-color: #e9ecef;
+            color: #495057;
+        }
+
+        /* Custom scrollable checkbox list */
+        .language-checkbox-list {
+            max-height: 140px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 0.5rem;
+        }
         
         @media (max-width: 767.98px) {
             .sidebar {
                 width: 100%;
+                flex-basis: 100%;
                 min-height: auto;
             }
         }
@@ -40,13 +62,13 @@
 <body class="bg-light">
 
 <!-- Alpine.js Root Component -->
-<div class="d-flex flex-md-row flex-column" x-data="orgManager()" x-init="fetchOrganizations()">
+<div class="d-flex flex-md-row flex-column" x-data="orgManager()" x-init="init()">
     
     <!-- Left Sidebar Navbar -->
     {% include "components/sidebar.html" %}
 
     <!-- Main Content Area -->
-    <main class="flex-grow-1 p-4">
+    <main class="flex-grow-1 p-4  overflow-auto">
         <h1 class="mb-4">Organizations</h1>
 
         <!-- Form Card -->
@@ -81,6 +103,35 @@
                             <label for="country" class="form-label">Country</label>
                             <input type="text" class="form-control" id="country" x-model="form.country" required>
                         </div>
+                        <div class="col-md-4">
+                            <label for="regions_operation" class="form-label">Regions of Operation</label>
+                            <input type="text" class="form-control" id="regions_operation" x-model="form.regions_operation" placeholder="e.g. EMEA, APAC">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="number_subsidiaries" class="form-label">Number of Subsidiaries</label>
+                            <input type="text" class="form-control" id="number_subsidiaries" x-model="form.number_subsidiaries" placeholder="e.g. 12">
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label">Languages</label>
+                            <div class="language-checkbox-list">
+                                <template x-for="lang in availableLanguages" :key="lang.id">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" 
+                                               :id="'lang-' + lang.code" 
+                                               :value="lang.code" 
+                                               x-model="form.selectedLanguages">
+                                        <label class="form-check-label" :for="'lang-' + lang.code" x-text="lang.name"></label>
+                                    </div>
+                                </template>
+                                <div x-show="availableLanguages.length === 0" class="text-muted small">
+                                    Loading languages...
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label for="company_overview" class="form-label">Company Overview</label>
+                            <textarea class="form-control" id="company_overview" x-model="form.company_overview" rows="3" placeholder="Brief overview of the company..."></textarea>
+                        </div>
                     </div>
                     <div class="mt-4">
                         <button type="submit" class="btn" :class="isEditing ? 'btn-warning' : 'btn-primary'" x-text="isEditing ? 'Update Organization' : 'Create Organization'"></button>
@@ -105,19 +156,21 @@
                                 <th>Email</th>
                                 <th>Industry</th>
                                 <th>Country</th>
+                                <th>Regions</th>
+                                <th>Subsidiaries</th>
+                                <th>Languages</th>
+                                <th>Overview</th>
                                 <th style="width: 150px;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <!-- Loading/Error State -->
                             <tr x-show="loading">
-                                <td colspan="6" class="text-center text-muted py-4">Loading organizations...</td>
+                                <td colspan="10" class="text-center text-muted py-4">Loading organizations...</td>
                             </tr>
                             <tr x-show="!loading && organizations.length === 0">
-                                <td colspan="6" class="text-center text-muted py-4">No organizations found.</td>
+                                <td colspan="10" class="text-center text-muted py-4">No organizations found.</td>
                             </tr>
                             
-                            <!-- Data Rows Loop -->
                             <template x-for="org in organizations" :key="org.id">
                                 <tr>
                                     <td class="fw-semibold" x-text="org.name"></td>
@@ -127,6 +180,25 @@
                                     <td x-text="org.email"></td>
                                     <td x-text="org.industry"></td>
                                     <td x-text="org.country"></td>
+                                    <td x-text="org.regions_operation || '—'"></td>
+                                    <td x-text="org.number_subsidiaries || '—'"></td>
+                                    <td>
+                                        <template x-if="org.languages">
+                                            <span>
+                                                <template x-for="code in org.languages.split(',').map(l => l.trim()).filter(l => l)" :key="code">
+                                                    <span class="lang-badge" x-text="getLanguageName(code)"></span>
+                                                </template>
+                                            </span>
+                                        </template>
+                                        <template x-if="!org.languages">
+                                            <span class="text-muted">—</span>
+                                        </template>
+                                    </td>
+                                    <td>
+                                        <span x-data="{ full: org.company_overview || '', short: (org.company_overview || '').substring(0, 50) }">
+                                            <span x-text="short + (full.length > 50 ? '…' : '') || '—'"></span>
+                                        </span>
+                                    </td>
                                     <td>
                                         <button class="btn btn-sm btn-outline-warning" @click="editOrganization(org)">Edit</button>
                                         <button class="btn btn-sm btn-outline-danger" @click="deleteOrganization(org)">Delete</button>
@@ -152,6 +224,7 @@
         return {
             // State
             organizations: [],
+            availableLanguages: [],
             loading: true,
             isEditing: false,
             form: {
@@ -160,17 +233,39 @@
                 type: 'customer',
                 email: '',
                 industry: '',
-                country: ''
+                country: '',
+                regions_operation: '',
+                number_subsidiaries: '',
+                company_overview: '',
+                selectedLanguages: [] // Array to bind to checkboxes
             },
 
-            // API Base URL
-            apiBase: "/organization",
+            // API Base URLs
+            orgApiBase: "/organization",
+            langApiBase: "/language",
+
+            // Initialization
+            async init() {
+                await this.fetchLanguages();
+                await this.fetchOrganizations();
+            },
+
+            // Fetch all available languages for the checkbox list
+            async fetchLanguages() {
+                try {
+                    const response = await fetch(`${this.langApiBase}/languages`);
+                    if (!response.ok) throw new Error("Failed to fetch languages");
+                    this.availableLanguages = await response.json();
+                } catch (error) {
+                    console.error("Error fetching languages:", error);
+                }
+            },
 
             // Fetch all organizations
             async fetchOrganizations() {
                 this.loading = true;
                 try {
-                    const response = await fetch(`${this.apiBase}/organizations`);
+                    const response = await fetch(`${this.orgApiBase}/organizations`);
                     if (!response.ok) throw new Error("Failed to fetch");
                     this.organizations = await response.json();
                 } catch (error) {
@@ -183,17 +278,26 @@
 
             // Handle Create or Update
             async submitForm() {
-                // Deep copy form data to avoid modifying the original state directly
                 let payload = JSON.parse(JSON.stringify(this.form));
-                
+
+                // FIX: Strip server-managed fields to prevent asyncpg string-to-timestamp error
+                delete payload.created_at;
+                delete payload.updated_at;
+
+                // Convert selectedLanguages array to comma-separated string for DB
+                payload.languages = payload.selectedLanguages.join(',');
+                delete payload.selectedLanguages;
+
                 try {
                     if (this.isEditing) {
                         // UPDATE (PATCH)
                         const id = payload.id;
+                        delete payload.id;
+
                         // Remove empty strings so backend exclude_none works properly
                         Object.keys(payload).forEach((k) => payload[k] === "" && delete payload[k]);
-                        
-                        const response = await fetch(`${this.apiBase}/?id=${id}`, {
+
+                        const response = await fetch(`${this.orgApiBase}/?id=${id}`, {
                             method: "PATCH",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify(payload)
@@ -202,8 +306,12 @@
                         if (!response.ok) throw new Error("Failed to update");
                     } else {
                         // CREATE (POST)
-                        delete payload.id; // Don't send ID on creation
-                        const response = await fetch(`${this.apiBase}/`, {
+                        delete payload.id;
+
+                        // Remove empty optional strings on create
+                        Object.keys(payload).forEach((k) => payload[k] === "" && delete payload[k]);
+
+                        const response = await fetch(`${this.orgApiBase}/`, {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify(payload)
@@ -213,7 +321,7 @@
                     }
 
                     this.resetForm();
-                    await this.fetchOrganizations(); // Refresh table
+                    await this.fetchOrganizations();
                 } catch (error) {
                     console.error(error);
                     alert("Error saving organization.");
@@ -223,8 +331,17 @@
             // Populate form for editing
             editOrganization(org) {
                 this.isEditing = true;
-                // Deep copy the org object to the form so table item doesn't mutate while typing
                 this.form = JSON.parse(JSON.stringify(org));
+
+                // Convert comma-separated string from DB back to array for checkboxes
+                this.form.selectedLanguages = this.form.languages 
+                    ? this.form.languages.split(',').map(l => l.trim()) 
+                    : [];
+
+                // Ensure all form keys exist
+                this.form.regions_operation = this.form.regions_operation || '';
+                this.form.number_subsidiaries = this.form.number_subsidiaries || '';
+                this.form.company_overview = this.form.company_overview || '';
             },
 
             // Delete organization
@@ -232,12 +349,12 @@
                 if (!confirm(`Are you sure you want to delete ${org.name}?`)) return;
 
                 try {
-                    const response = await fetch(`${this.apiBase}/?id=${org.id}`, {
+                    const response = await fetch(`${this.orgApiBase}/?id=${org.id}`, {
                         method: "DELETE"
                     });
 
                     if (!response.ok) throw new Error("Failed to delete");
-                    await this.fetchOrganizations(); // Refresh table
+                    await this.fetchOrganizations();
                 } catch (error) {
                     console.error(error);
                     alert("Error deleting organization.");
@@ -253,7 +370,11 @@
                     type: 'customer',
                     email: '',
                     industry: '',
-                    country: ''
+                    country: '',
+                    regions_operation: '',
+                    number_subsidiaries: '',
+                    company_overview: '',
+                    selectedLanguages: []
                 };
             },
 
@@ -265,6 +386,12 @@
                     case 'internal': return 'info';
                     default: return 'secondary';
                 }
+            },
+
+            // Helper to display language name from code in the table
+            getLanguageName(code) {
+                const lang = this.availableLanguages.find(l => l.code === code);
+                return lang ? lang.name : code;
             }
         }
     }

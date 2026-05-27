@@ -46,13 +46,23 @@ class SubtypeName(str, Enum):
     technical_lead = "technical_lead"
     customer_success_manager = "customer_success_manager"
     head_of_professional_service = "head_of_professional_service"
+    account_executive = "account_executive"  # 🆕 Required for AE stakeholder
 
+
+
+    
 
 class ProjectType(str, Enum):
     pilot = "pilot"
     poc = "poc"
     custom_demo = "custom_demo"
     rollout = "rollout"
+
+
+class ProjectStatus(str, Enum): # NEW ENUM
+    draft = "draft"
+    completed = "completed"
+    archived = "archived"
 
 
 class IntegrationType(str, Enum):
@@ -125,6 +135,13 @@ class ProjectStakeholder(SQLModel, table=True):
     role: Optional[str] = Field(default=None)
 
 
+class ProjectUsecase(SQLModel, table=True): # NEW LINK MODEL
+    __tablename__ = "project_usecase"
+
+    project_id: UUID = Field(foreign_key="project.id", primary_key=True)
+    usecase_id: UUID = Field(foreign_key="usecase.id", primary_key=True)
+
+
 class FeatureUsecase(SQLModel, table=True):
     __tablename__ = "feature_usecase"
 
@@ -180,6 +197,51 @@ class HyStudioCompanyProject(SQLModel, table=True):
 # ===================== Main Models =====================
 
 
+# class Organization(SQLModel, table=True):
+#     __tablename__ = "organization"
+
+#     id: UUID = Field(
+#         sa_column=Column(postgresql.UUID, default=uuid4, primary_key=True)
+#     )
+#     name: str
+#     type: OrganizationType
+#     email: EmailStr
+#     industry: str
+#     country: str
+#     created_at: datetime = Field(default_factory=datetime.utcnow)
+#     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+#     users: list["User"] = Relationship(
+#         back_populates="organization",
+#         sa_relationship_kwargs={"lazy": "selectin"},
+#     )
+#     projects: list["Project"] = Relationship(
+#         back_populates="customer",
+#         sa_relationship_kwargs={"lazy": "selectin"},
+#     )
+#     teams_groups: list["OrganizationTeamsGroup"] = Relationship(
+#         back_populates="organization",
+#         sa_relationship_kwargs={"lazy": "selectin"},
+#     )
+#     slack_channels: list["OrganizationSlackChannel"] = Relationship(
+#         back_populates="organization",
+#         sa_relationship_kwargs={"lazy": "selectin"},
+#     )
+#     metabase_groups: list["OrganizationMetabaseGroup"] = Relationship(
+#         back_populates="organization",
+#         sa_relationship_kwargs={"lazy": "selectin"},
+#     )
+#     hystudio_companies: list["OrganizationHyStudioCompany"] = Relationship(
+#         back_populates="organization",
+#         sa_relationship_kwargs={"lazy": "selectin"},
+#     )
+#     erp_systems: list["ERPSystem"] = Relationship(
+#         back_populates="organization",
+#         sa_relationship_kwargs={"lazy": "selectin"},
+#     )
+
+
+
 class Organization(SQLModel, table=True):
     __tablename__ = "organization"
 
@@ -191,6 +253,10 @@ class Organization(SQLModel, table=True):
     email: EmailStr
     industry: str
     country: str
+    regions_operation: Optional[str] = Field(default=None)
+    number_subsidiaries: Optional[str] = Field(default=None)
+    company_overview: Optional[str] = Field(default=None)
+    languages: Optional[str] = Field(default=None)  # comma-separated
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -222,6 +288,7 @@ class Organization(SQLModel, table=True):
         back_populates="organization",
         sa_relationship_kwargs={"lazy": "selectin"},
     )
+
 
 
 class Subtype(SQLModel, table=True):
@@ -361,9 +428,118 @@ class Project(SQLModel, table=True):
     integration_type: IntegrationType
     partner_budget_hours: Decimal = Field(sa_column=Column(Numeric))
     internal_budget_hours: Decimal = Field(sa_column=Column(Numeric))
+    
+    # --- NEW FIELDS ---
+    status: ProjectStatus = ProjectStatus.draft
+    primary_usecase_id: Optional[UUID] = Field(default=None, foreign_key="usecase.id")
+
+    # Technical Integration
+    target_erp: Optional[str] = None
+    sap_addon_concerns: Optional[str] = None
+    current_workflow: Optional[str] = None
+    existing_services: Optional[str] = None
+    document_receipt_channels: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list) # Multiselect
+    data_points_current: Optional[str] = None
+    current_process_overview: Optional[str] = None
+    number_erp_systems: Optional[int] = None
+
+    # Document Processing Discovery
+    users_work_in_studio: Optional[str] = None
+    supplier_guidelines: Optional[str] = None
+    other_processing_guidelines: Optional[str] = None
+    multi_invoice_documents: Optional[str] = None
+    multi_invoice_share: Optional[int] = None
+    file_formats_received: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list) # Multiselect
+    poor_quality_scans: Optional[str] = None
+    document_submission_channels: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list) # Multiselect
+    expected_doc_types_in_channels: Optional[str] = None
+    out_of_scope_handling: Optional[str] = None
+    scanning_method: Optional[str] = None
+    barcoding_separation: Optional[str] = None
+    classify_during_scan: Optional[str] = None
+
+    # Email Processing
+    email_content_downstream: Optional[str] = None
+    eml_archiving: Optional[str] = None
+    inbound_email_rules: Optional[str] = None
+    email_routing: Optional[str] = None
+
+    # Classification & Matching
+    document_classification_method: Optional[str] = None
+    statements_classification: Optional[str] = None
+    statements_downstream: Optional[str] = None
+    leases_recurring_handling: Optional[str] = None
+    po_nonpo_identification: Optional[str] = None
+    po_nonpo_distribution: Optional[str] = None
+    rejection_classification: Optional[str] = None
+    rejection_timing: Optional[str] = None
+    rejection_communication: Optional[str] = None
+    standardized_rejection_messages: Optional[str] = None
+    bounced_rejections_handling: Optional[str] = None
+
+    # Master Data & Verification
+    verification_team_structure: Optional[str] = None
+    routing_criteria: Optional[str] = None
+    master_data_assignment: Optional[str] = None
+    missing_master_data_handling: Optional[str] = None
+    duplicate_master_data: Optional[str] = None
+
+    # PO Matching & Processing
+    delivery_note_extraction: Optional[str] = None
+    po_types_common: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list) # Multiselect
+    po_vs_invoice_values: Optional[str] = None
+    po_deviation_handling: Optional[str] = None
+    missing_po_number: Optional[str] = None
+    non_matched_po_processing: Optional[str] = None
+
+    # Accounting Coding & GL
+    custom_gl_logic: Optional[str] = None
+    mandatory_posting_attributes: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list) # Multiselect
+    accounting_templates_usage: Optional[str] = None
+    gl_costcenter_assignment: Optional[str] = None
+    reviewer_approver_derivation: Optional[str] = None
+    
+    
+    # 📊 Volume & Performance Metrics
+    annual_doc_volume_per_usecase: Optional[int] = Field(default=0)
+    e2e_cost_per_doc: Optional[Decimal] = Field(default=0, sa_column=Column(Numeric))
+    e2e_processing_time_mins: Optional[int] = Field(default=0)
+    automation_improvement_percentage: Optional[int] = Field(default=0)
+    approx_supplier_customer_count: Optional[int] = Field(default=0)
+
+    # KPIs & Success Measurement
+    current_kpis: Optional[str] = None
+    verification_team_kpis: Optional[str] = None
+    special_document_handling: Optional[str] = None
+
+    # --- NEW: Generated Document Paths ---
+    sow_markdown_path: Optional[str] = None
+    sow_docx_path: Optional[str] = None
+    success_contract_path: Optional[str] = None
+    solution_design_path: Optional[str] = None
+    
+    
+    # 🆕 REQUIRED FOR DOCUMENT GENERATION:
+    go_live_date: Optional[date] = None
+    go_live_regions: Optional[str] = None
+    rollout_regions: Optional[str] = None
+    project_background: Optional[str] = None
+    main_objectives: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list)
+    top_three_pain_points: Optional[str] = None
+    language_constraints: Optional[str] = None
+    project_risks: Optional[str] = None
+    overall_accuracy_target: Optional[int] = None
+    success_criteria: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list)
+    success_criteria_custom: Optional[str] = None
+    document_types: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list)
+    # Structure: [{"document_name": "Invoice", "accuracy_target": 95}]
+    
+
+    # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
+    # Relationships
     customer: Organization = Relationship(
         back_populates="projects",
         sa_relationship_kwargs={"lazy": "selectin"},
@@ -375,6 +551,14 @@ class Project(SQLModel, table=True):
     stakeholders: list[User] = Relationship(
         back_populates="projects",
         link_model=ProjectStakeholder,
+        sa_relationship_kwargs={"lazy": "selectin"},
+    )
+    linked_usecases: list["Usecase"] = Relationship(
+        back_populates="projects",
+        link_model=ProjectUsecase,
+        sa_relationship_kwargs={"lazy": "selectin"},
+    )
+    primary_usecase: Optional["Usecase"] = Relationship(
         sa_relationship_kwargs={"lazy": "selectin"},
     )
     generated_documents: list["GeneratedDocument"] = Relationship(
@@ -390,6 +574,8 @@ class Project(SQLModel, table=True):
         link_model=HyStudioCompanyProject,
         sa_relationship_kwargs={"lazy": "selectin"},
     )
+
+
 
 
 class Capability(SQLModel, table=True):
@@ -430,6 +616,11 @@ class Feature(SQLModel, table=True):
     multiple_value: int
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    
+    # 🆕 Required for Solution Design Document tables
+    requirements: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list)
+    # Structure: [{"requirement": "...", "description": "...", "solution": "..."}]
 
     capability: Capability = Relationship(
         back_populates="features",
@@ -522,6 +713,12 @@ class Usecase(SQLModel, table=True):
     features: list[Feature] = Relationship(
         back_populates="usecases",
         link_model=FeatureUsecase,
+        sa_relationship_kwargs={"lazy": "selectin"},
+    )
+    # NEW RELATIONSHIP
+    projects: list["Project"] = Relationship(
+        back_populates="linked_usecases",
+        link_model=ProjectUsecase,
         sa_relationship_kwargs={"lazy": "selectin"},
     )
 

@@ -20,5 +20,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # This brings in the 'app/' folder, so the structure inside is /app/app/main.py
 COPY . .
 
+EXPOSE 8000
+
 # Run the application (overridden by docker-compose for development --reload)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# For local development
+# CMD ["fastapi", "dev","--port","8000"]
+
+
+# For production
+CMD ["fastapi", "run","--host", "0.0.0.0","--port","8000"]

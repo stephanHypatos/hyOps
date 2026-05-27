@@ -5,18 +5,55 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Projects</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+
     <style>
-        .sidebar { width: 260px; min-height: 100vh; }
-        .sidebar .nav-link { color: rgba(255, 255, 255, 0.75); border-radius: 5px; margin-bottom: 5px; }
-        .sidebar .nav-link:hover { color: #fff; background-color: rgba(255, 255, 255, 0.1); }
-        .sidebar .nav-link.active { color: #fff; background-color: #0d6efd; }
-        .sidebar .submenu { padding-left: 1rem; }
-        .sidebar .nav-link[data-bs-toggle="collapse"]::after { content: '\25BC'; float: right; font-size: 0.7rem; margin-top: 0.3rem; transition: transform 0.2s ease-in-out; }
-        .sidebar .nav-link[data-bs-toggle="collapse"][aria-expanded="false"]::after { transform: rotate(-90deg); }
-        @media (max-width: 767.98px) { .sidebar { width: 100%; min-height: auto; } }
-    </style>
+    .sidebar { 
+        width: 260px; 
+        min-width: 260px; 
+        min-height: 100vh; 
+        flex-shrink: 0; 
+    }
+    .sidebar .nav-link { color: rgba(255, 255, 255, 0.75); border-radius: 5px; margin-bottom: 5px; }
+    .sidebar .nav-link:hover { color: #fff; background-color: rgba(255, 255, 255, 0.1); }
+    .sidebar .nav-link.active { color: #fff; background-color: #0d6efd; }
+    .sidebar .submenu { padding-left: 1rem; }
+    .sidebar .nav-link[data-bs-toggle="collapse"]::after { content: '\25BC'; float: right; font-size: 0.7rem; margin-top: 0.3rem; transition: transform 0.2s ease-in-out; }
+    .sidebar .nav-link[data-bs-toggle="collapse"][aria-expanded="false"]::after { transform: rotate(-90deg); }
+    @media (max-width: 767.98px) { 
+        .sidebar { width: 100%; min-width: 100%; min-height: auto; }
+    }
+    .accordion-button:not(.collapsed) { background-color: #e7f1ff; color: #0d6efd; }
+    .dynamic-item { 
+        border: 1px solid #dee2e6; 
+        border-radius: 6px; 
+        padding: 8px 12px; 
+        margin-bottom: 6px; 
+        background: #f8f9fa;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .dynamic-item:hover { background: #e9ecef; }
+    .badge-role { font-size: 0.75rem; }
+    .doc-card { transition: all 0.2s ease; }
+    .doc-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .toast-container { z-index: 9999; }
+</style>
 </head>
 <body class="bg-light">
+
+<!-- Toast notification -->
+<div class="toast-container position-fixed top-0 end-0 p-3">
+    <div id="fillToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="bi bi-check-circle me-2"></i>Form filled with sample data successfully!
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+</div>
 
 <div class="d-flex flex-md-row flex-column" x-data="projectManager()" x-init="initData()">
     {% include "components/sidebar.html" %}
@@ -29,19 +66,31 @@
         <div x-show="!selectedProject">
             <h1 class="mb-4">Projects</h1>
 
-            <!-- Project Form Card -->
             <div class="card shadow-sm mb-4">
-                <div class="card-header bg-white">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
                     <h5 class="mb-0" x-text="isEditing ? 'Edit Project' : 'Add New Project'"></h5>
+                    <button type="button" class="btn btn-outline-info btn-sm" @click="fillStaticData()" :disabled="isEditing">
+                        <i class="bi bi-magic me-1"></i> Fill Sample Data
+                    </button>
                 </div>
                 <div class="card-body">
                     <form @submit.prevent="submitForm()">
+                        
+                        <!-- Core Info -->
                         <div class="row g-3 mb-3">
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label class="form-label">Project Name</label>
                                 <input type="text" class="form-control" x-model="form.name" required>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
+                                <label class="form-label">Status</label>
+                                <select class="form-select" x-model="form.status" required>
+                                    <option value="draft">Draft</option>
+                                    <option value="completed">Completed</option>
+                                    <option value="archived">Archived</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
                                 <label class="form-label">Project Type</label>
                                 <select class="form-select" x-model="form.type" required>
                                     <option value="pilot">Pilot</option>
@@ -61,7 +110,7 @@
                         </div>
 
                         <div class="row g-3 mb-3">
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <label class="form-label">Customer (Organization)</label>
                                 <select class="form-select" x-model="form.customer_id" required>
                                     <option value="" disabled>Select Customer...</option>
@@ -70,7 +119,7 @@
                                     </template>
                                 </select>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <label class="form-label">Deal Winner (User)</label>
                                 <select class="form-select" x-model="form.deal_winner_id" required>
                                     <option value="" disabled>Select User...</option>
@@ -79,40 +128,322 @@
                                     </template>
                                 </select>
                             </div>
-                        </div>
-
-                        <div class="row g-3 mb-3 border rounded p-3 pt-1">
-                            <div class="col-md-3">
-                                <div class="form-check form-switch mt-md-4">
-                                    <input class="form-check-input" type="checkbox" x-model="form.requires_integration" id="intSwitch">
-                                    <label class="form-check-label" for="intSwitch">Requires Integration</label>
-                                </div>
-                            </div>
-                            <div class="col-md-9" x-show="form.requires_integration" x-transition>
-                                <label class="form-label">Integration Type</label>
-                                <select class="form-select" x-model="form.integration_type" :required="form.requires_integration">
-                                    <option value="sap_addon">SAP Addon</option>
-                                    <option value="sap_cloud_connector">SAP Cloud Connector</option>
-                                    <option value="coupa_connector">Coupa Connector</option>
-                                    <option value="boomi">Boomi</option>
-                                    <option value="custom_middleware">Custom Middleware</option>
+                            <div class="col-md-4">
+                                <label class="form-label">Primary Usecase</label>
+                                <select class="form-select" x-model="form.primary_usecase_id" @change="loadUsecaseFeatures(form.primary_usecase_id)">
+                                    <option value="">None</option>
+                                    <template x-for="uc in usecases" :key="uc.id">
+                                        <option :value="uc.id" x-text="uc.name"></option>
+                                    </template>
                                 </select>
                             </div>
                         </div>
 
-                        <div class="row g-3 mb-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Partner Budget (Hours)</label>
-                                <input type="number" step="0.5" class="form-control" x-model="form.partner_budget_hours" required min="0">
+                        <!-- Dynamic Feature Display for Selected Usecase -->
+                        <div class="row g-3 mb-3" x-show="form.primary_usecase_id && selectedUsecaseFeatures.length > 0" x-transition>
+                            <div class="col-12">
+                                <div class="card border-primary bg-light">
+                                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-0">Features included in this Usecase</h6>
+                                        <span class="badge bg-light text-primary" x-text="selectedUsecaseFeatures.length + ' features'"></span>
+                                    </div>
+                                    <div class="card-body p-2" style="max-height: 200px; overflow-y: auto;">
+                                        <div class="row">
+                                            <template x-for="feat in selectedUsecaseFeatures" :key="feat.id">
+                                                <div class="col-md-4 col-lg-3 p-1">
+                                                    <div class="card h-100 small">
+                                                        <div class="card-body p-2">
+                                                            <div class="d-flex justify-content-between align-items-start">
+                                                                <strong class="text-primary" x-text="feat.name"></strong>
+                                                                <span class="badge" :class="feat.active ? 'bg-success' : 'bg-secondary'" x-text="feat.active ? 'Active' : 'Inactive'"></span>
+                                                            </div>
+                                                            <div class="mt-1">
+                                                                <span class="badge bg-info text-capitalize" x-text="feat.scope_type ? feat.scope_type.replace('_', ' ') : ''"></span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Internal Budget (Hours)</label>
-                                <input type="number" step="0.5" class="form-control" x-model="form.internal_budget_hours" required min="0">
+                        </div>
+
+                        <!-- Advanced Sections (Accordion) -->
+                        <div class="accordion mb-3" id="projectAccordion">
+                            
+                            <!-- Project Details & Objectives -->
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#projDetails">
+                                        Project Details & Objectives
+                                    </button>
+                                </h2>
+                                <div id="projDetails" class="accordion-collapse collapse show">
+                                    <div class="accordion-body row g-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label">Go-Live Date</label>
+                                            <input type="date" class="form-control" x-model="form.go_live_date">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Go-Live Regions</label>
+                                            <input type="text" class="form-control" x-model="form.go_live_regions" placeholder="e.g., Germany, UK, France">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Rollout Regions</label>
+                                            <input type="text" class="form-control" x-model="form.rollout_regions" placeholder="e.g., Spain, Italy (Phase 2)">
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label">Project Background</label>
+                                            <textarea class="form-control" x-model="form.project_background" rows="3" placeholder="Why does this project exist? What are the goals?"></textarea>
+                                        </div>
+
+                                        <div class="col-12">
+                                            <label class="form-label">Main Objectives</label>
+                                            <div class="input-group mb-2">
+                                                <input type="text" class="form-control" x-model="objectiveInput" placeholder="Type an objective and click Add" @keydown.enter.prevent="addListItem('main_objectives', objectiveInput); objectiveInput = ''">
+                                                <button class="btn btn-outline-primary" type="button" @click="addListItem('main_objectives', objectiveInput); objectiveInput = ''">
+                                                    <i class="bi bi-plus-lg"></i> Add
+                                                </button>
+                                            </div>
+                                            <template x-for="(obj, i) in form.main_objectives" :key="i">
+                                                <div class="dynamic-item">
+                                                    <span x-text="obj"></span>
+                                                    <button type="button" class="btn btn-sm btn-outline-danger" @click="removeListItem('main_objectives', i)">
+                                                        <i class="bi bi-x-lg"></i>
+                                                    </button>
+                                                </div>
+                                            </template>
+                                        </div>
+
+                                        <div class="col-12">
+                                            <label class="form-label">Top Three Pain Points</label>
+                                            <textarea class="form-control" x-model="form.top_three_pain_points" rows="3" placeholder="1. Manual data entry is error-prone&#10;2. Lack of visibility&#10;3. High exception handling costs"></textarea>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Language Constraints</label>
+                                            <select class="form-select" x-model="form.language_constraints">
+                                                <option value="">Select...</option>
+                                                <option value="No language constraints - English is fine">No language constraints - English is fine</option>
+                                                <option value="German required">German required</option>
+                                                <option value="French required">French required</option>
+                                                <option value="Multiple languages required">Multiple languages required</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Overall Accuracy Target (%)</label>
+                                            <input type="number" class="form-control" x-model="form.overall_accuracy_target" min="0" max="100" placeholder="95">
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label">Project Risks</label>
+                                            <textarea class="form-control" x-model="form.project_risks" rows="2" placeholder="Data quality in legacy systems, change management, resource availability..."></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Success Criteria & Document Types -->
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#successSection">
+                                        Success Criteria & Document Types
+                                    </button>
+                                </h2>
+                                <div id="successSection" class="accordion-collapse collapse">
+                                    <div class="accordion-body row g-3">
+                                        <div class="col-12">
+                                            <label class="form-label">Success Criteria</label>
+                                            <div class="input-group mb-2">
+                                                <input type="text" class="form-control" x-model="criteriaInput" placeholder="Type a success criterion and click Add" @keydown.enter.prevent="addListItem('success_criteria', criteriaInput); criteriaInput = ''">
+                                                <button class="btn btn-outline-primary" type="button" @click="addListItem('success_criteria', criteriaInput); criteriaInput = ''">
+                                                    <i class="bi bi-plus-lg"></i> Add
+                                                </button>
+                                            </div>
+                                            <template x-for="(crit, i) in form.success_criteria" :key="i">
+                                                <div class="dynamic-item">
+                                                    <span x-text="crit"></span>
+                                                    <button type="button" class="btn btn-sm btn-outline-danger" @click="removeListItem('success_criteria', i)">
+                                                        <i class="bi bi-x-lg"></i>
+                                                    </button>
+                                                </div>
+                                            </template>
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label">Custom Success Criteria</label>
+                                            <textarea class="form-control" x-model="form.success_criteria_custom" rows="2" placeholder="Any additional criteria not listed above..."></textarea>
+                                        </div>
+                                        <hr class="my-2">
+                                        <div class="col-12">
+                                            <label class="form-label">Document Types & Accuracy Targets</label>
+                                            <div class="row g-2 mb-2">
+                                                <div class="col-md-5">
+                                                    <input type="text" class="form-control form-control-sm" x-model="docTypeInput.document_name" placeholder="Document name (e.g., Invoice)">
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <input type="number" class="form-control form-control-sm" x-model="docTypeInput.accuracy_target" placeholder="Accuracy %" min="0" max="100">
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <button class="btn btn-sm btn-outline-primary w-100" type="button" @click="addDocType()">
+                                                        <i class="bi bi-plus-lg"></i> Add Document Type
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <template x-for="(dt, i) in form.document_types" :key="i">
+                                                <div class="dynamic-item">
+                                                    <div>
+                                                        <strong x-text="dt.document_name"></strong>
+                                                        <span class="badge bg-info ms-2" x-text="dt.accuracy_target + '%'"></span>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm btn-outline-danger" @click="form.document_types.splice(i, 1)">
+                                                        <i class="bi bi-x-lg"></i>
+                                                    </button>
+                                                </div>
+                                            </template>
+                                            <div x-show="form.document_types.length === 0" class="text-muted small">No document types added yet.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Volume & Performance Metrics -->
+                            <div class="accordion-item">
+                                <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#volumeSection">Volume & Performance Metrics</button></h2>
+                                <div id="volumeSection" class="accordion-collapse collapse">
+                                    <div class="accordion-body row g-3">
+                                        <div class="col-md-4"><label class="form-label">Annual Document Volume</label><input type="number" class="form-control" x-model="form.annual_doc_volume_per_usecase" min="0" placeholder="e.g., 120000"></div>
+                                        <div class="col-md-4"><label class="form-label">E2E Cost Per Document</label><input type="number" step="0.01" class="form-control" x-model="form.e2e_cost_per_doc" min="0" placeholder="e.g., 8.50"></div>
+                                        <div class="col-md-4"><label class="form-label">E2E Processing Time (mins)</label><input type="number" class="form-control" x-model="form.e2e_processing_time_mins" min="0" placeholder="e.g., 15"></div>
+                                        <div class="col-md-4"><label class="form-label">Current Automation (%)</label><input type="number" class="form-control" x-model="form.automation_improvement_percentage" min="0" max="100" placeholder="e.g., 30"></div>
+                                        <div class="col-md-4"><label class="form-label">Supplier/Customer Count</label><input type="number" class="form-control" x-model="form.approx_supplier_customer_count" min="0" placeholder="e.g., 450"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Technical Integration -->
+                            <div class="accordion-item">
+                                <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#techInteg">Technical Integration</button></h2>
+                                <div id="techInteg" class="accordion-collapse collapse">
+                                    <div class="accordion-body row g-3">
+                                        <div class="col-md-4"><label class="form-label">Requires Integration?</label><select class="form-select" x-model="form.requires_integration"><option value="true">Yes</option><option value="false">No</option></select></div>
+                                        <div class="col-md-8" x-show="form.requires_integration == 'true'" x-transition><label class="form-label">Integration Type</label><select class="form-select" x-model="form.integration_type"><option value="none">None</option><option value="sap_addon">SAP Addon</option><option value="sap_cloud_connector">SAP Cloud Connector</option><option value="coupa_connector">Coupa Connector</option><option value="boomi">Boomi</option><option value="custom_middleware">Custom Middleware</option></select></div>
+                                        <div class="col-md-6"><label class="form-label">Target ERP</label><input type="text" class="form-control" x-model="form.target_erp" placeholder="e.g., SAP S/4HANA"></div>
+                                        <div class="col-md-6"><label class="form-label">Number of ERP Systems</label><input type="number" class="form-control" x-model="form.number_erp_systems"></div>
+                                        <div class="col-12"><label class="form-label">SAP Addon Concerns</label><textarea class="form-control" x-model="form.sap_addon_concerns" rows="2"></textarea></div>
+                                        <div class="col-12"><label class="form-label">Current Workflow</label><input type="text" class="form-control" x-model="form.current_workflow"></div>
+                                        <div class="col-12"><label class="form-label">Existing Services</label><input type="text" class="form-control" x-model="form.existing_services"></div>
+                                        <div class="col-12"><label class="form-label">Document Receipt Channels</label><div class="d-flex flex-wrap gap-3"><template x-for="opt in ['Email', 'Portal', 'EDI', 'API', 'Manual Upload', 'Scan', 'Other']" :key="opt"><div class="form-check"><input class="form-check-input" type="checkbox" :id="'docRec_'+opt" :checked="form.document_receipt_channels.includes(opt)" @change="toggleArrayItem(form.document_receipt_channels, opt)"><label class="form-check-label" :for="'docRec_'+opt" x-text="opt"></label></div></template></div></div>
+                                        <div class="col-12"><label class="form-label">Data Points Current</label><input type="text" class="form-control" x-model="form.data_points_current"></div>
+                                        <div class="col-md-6"><label class="form-label">Partner Budget (Hours)</label><input type="number" step="0.5" class="form-control" x-model="form.partner_budget_hours" required min="0"></div>
+                                        <div class="col-md-6"><label class="form-label">Internal Budget (Hours)</label><input type="number" step="0.5" class="form-control" x-model="form.internal_budget_hours" required min="0"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Document Processing Discovery -->
+                            <div class="accordion-item">
+                                <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#docProcessing">Document Processing Discovery</button></h2>
+                                <div id="docProcessing" class="accordion-collapse collapse">
+                                    <div class="accordion-body row g-3">
+                                        <div class="col-md-4"><label class="form-label">Users work in Studio?</label><select class="form-select" x-model="form.users_work_in_studio"><option value="">Select...</option><option value="Users work in Studio">Users work in Studio</option><option value="External validation">External validation</option><option value="Mixed">Mixed</option></select></div>
+                                        <div class="col-md-4"><label class="form-label">Supplier Guidelines?</label><select class="form-select" x-model="form.supplier_guidelines"><option value="">Select...</option><option value="Yes">Yes</option><option value="No">No</option><option value="Partial">Partial</option></select></div>
+                                        <div class="col-md-4"><label class="form-label">Multi Invoice Documents?</label><select class="form-select" x-model="form.multi_invoice_documents"><option value="">Select...</option><option value="Often">Often</option><option value="Sometimes">Sometimes</option><option value="Never">Never</option></select></div>
+                                        <div class="col-md-4"><label class="form-label">Multi Invoice Share (%)</label><input type="number" class="form-control" x-model="form.multi_invoice_share"></div>
+                                        <div class="col-md-4"><label class="form-label">Poor Quality Scans?</label><select class="form-select" x-model="form.poor_quality_scans"><option value="">Select...</option><option value="Often">Often</option><option value="Sometimes">Sometimes</option><option value="Rarely">Rarely</option><option value="Never">Never</option></select></div>
+                                        <div class="col-md-4"><label class="form-label">Out of Scope Handling</label><select class="form-select" x-model="form.out_of_scope_handling"><option value="">Select...</option><option value="Forward to email">Forward to email</option><option value="Archive automatically">Archive automatically</option><option value="Manual review">Manual review</option><option value="Delete">Delete</option></select></div>
+                                        <div class="col-12"><label class="form-label">File Formats Received</label><div class="d-flex flex-wrap gap-3"><template x-for="opt in ['PDF', 'PDF/A', 'TIFF', 'JPG', 'PNG', 'XML', 'EDI', 'Other']" :key="opt"><div class="form-check"><input class="form-check-input" type="checkbox" :id="'fileFmt_'+opt" :checked="form.file_formats_received.includes(opt)" @change="toggleArrayItem(form.file_formats_received, opt)"><label class="form-check-label" :for="'fileFmt_'+opt" x-text="opt"></label></div></template></div></div>
+                                        <div class="col-12"><label class="form-label">Document Submission Channels</label><div class="d-flex flex-wrap gap-3"><template x-for="opt in ['Email', 'Portal', 'EDI', 'Scan', 'Manual Upload', 'Vendor Portal', 'Other']" :key="opt"><div class="form-check"><input class="form-check-input" type="checkbox" :id="'docSub_'+opt" :checked="form.document_submission_channels.includes(opt)" @change="toggleArrayItem(form.document_submission_channels, opt)"><label class="form-check-label" :for="'docSub_'+opt" x-text="opt"></label></div></template></div></div>
+                                        <div class="col-md-6"><label class="form-label">Expected Doc Types in Channels</label><input type="text" class="form-control" x-model="form.expected_doc_types_in_channels"></div>
+                                        <div class="col-12"><label class="form-label">Other Processing Guidelines</label><textarea class="form-control" x-model="form.other_processing_guidelines" rows="2"></textarea></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Email Processing -->
+                            <div class="accordion-item">
+                                <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#emailSection">Email Processing</button></h2>
+                                <div id="emailSection" class="accordion-collapse collapse">
+                                    <div class="accordion-body row g-3">
+                                        <div class="col-md-6"><label class="form-label">Email Content Downstream?</label><input type="text" class="form-control" x-model="form.email_content_downstream"></div>
+                                        <div class="col-md-6"><label class="form-label">EML Archiving?</label><select class="form-select" x-model="form.eml_archiving"><option value="">Select...</option><option value="Yes">Yes</option><option value="No">No</option><option value="Not required">Not required</option></select></div>
+                                        <div class="col-md-6"><label class="form-label">Inbound Email Rules?</label><input type="text" class="form-control" x-model="form.inbound_email_rules"></div>
+                                        <div class="col-md-6"><label class="form-label">Email Routing Strategy</label><input type="text" class="form-control" x-model="form.email_routing"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Classification & Matching -->
+                            <div class="accordion-item">
+                                <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#classMatch">Classification & Matching</button></h2>
+                                <div id="classMatch" class="accordion-collapse collapse">
+                                    <div class="accordion-body row g-3">
+                                        <div class="col-md-6"><label class="form-label">Document Classification Method</label><input type="text" class="form-control" x-model="form.document_classification_method"></div>
+                                        <div class="col-md-6"><label class="form-label">Statements Classification?</label><input type="text" class="form-control" x-model="form.statements_classification"></div>
+                                        <div class="col-md-6"><label class="form-label">Statements Downstream?</label><input type="text" class="form-control" x-model="form.statements_downstream"></div>
+                                        <div class="col-md-6"><label class="form-label">Leases Recurring Handling?</label><input type="text" class="form-control" x-model="form.leases_recurring_handling"></div>
+                                        <div class="col-md-6"><label class="form-label">PO / Non-PO Identification?</label><input type="text" class="form-control" x-model="form.po_nonpo_identification"></div>
+                                        <div class="col-md-6"><label class="form-label">PO / Non-PO Distribution</label><input type="text" class="form-control" x-model="form.po_nonpo_distribution"></div>
+                                        <div class="col-md-4"><label class="form-label">Rejection Classification</label><input type="text" class="form-control" x-model="form.rejection_classification"></div>
+                                        <div class="col-md-4"><label class="form-label">Rejection Timing</label><input type="text" class="form-control" x-model="form.rejection_timing"></div>
+                                        <div class="col-md-4"><label class="form-label">Rejection Communication</label><input type="text" class="form-control" x-model="form.rejection_communication"></div>
+                                        <div class="col-md-6"><label class="form-label">Standardized Rejection Messages?</label><input type="text" class="form-control" x-model="form.standardized_rejection_messages"></div>
+                                        <div class="col-md-6"><label class="form-label">Bounced Rejections Handling?</label><input type="text" class="form-control" x-model="form.bounced_rejections_handling"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Master Data, PO, GL, KPIs -->
+                            <div class="accordion-item">
+                                <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#masterData">Master Data & Verification</button></h2>
+                                <div id="masterData" class="accordion-collapse collapse">
+                                    <div class="accordion-body row g-3">
+                                        <div class="col-md-6"><label class="form-label">Verification Team Structure</label><input type="text" class="form-control" x-model="form.verification_team_structure"></div>
+                                        <div class="col-md-6"><label class="form-label">Routing Criteria?</label><input type="text" class="form-control" x-model="form.routing_criteria"></div>
+                                        <div class="col-md-6"><label class="form-label">Master Data Assignment?</label><input type="text" class="form-control" x-model="form.master_data_assignment"></div>
+                                        <div class="col-md-6"><label class="form-label">Missing Master Data Handling?</label><input type="text" class="form-control" x-model="form.missing_master_data_handling"></div>
+                                        <div class="col-md-6"><label class="form-label">Duplicate Master Data?</label><select class="form-select" x-model="form.duplicate_master_data"><option value="">Select...</option><option value="Yes, many">Yes, many</option><option value="Some">Some</option><option value="Very few">Very few</option></select></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="accordion-item">
+                                <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#poMatch">PO Matching & Processing</button></h2>
+                                <div id="poMatch" class="accordion-collapse collapse">
+                                    <div class="accordion-body row g-3">
+                                        <div class="col-md-6"><label class="form-label">Delivery Note Extraction?</label><select class="form-select" x-model="form.delivery_note_extraction"><option value="">Select...</option><option value="Yes">Yes</option><option value="No">No</option><option value="Sometimes">Sometimes</option></select></div>
+                                        <div class="col-12"><label class="form-label">PO Types Common</label><div class="d-flex flex-wrap gap-3"><template x-for="opt in ['Standard PO', 'Limit PO', 'Material PO', 'Service PO', 'Other']" :key="opt"><div class="form-check"><input class="form-check-input" type="checkbox" :id="'poType_'+opt" :checked="form.po_types_common.includes(opt)" @change="toggleArrayItem(form.po_types_common, opt)"><label class="form-check-label" :for="'poType_'+opt" x-text="opt"></label></div></template></div></div>
+                                        <div class="col-md-6"><label class="form-label">PO vs Invoice Values?</label><input type="text" class="form-control" x-model="form.po_vs_invoice_values"></div>
+                                        <div class="col-md-6"><label class="form-label">PO Deviation Handling?</label><input type="text" class="form-control" x-model="form.po_deviation_handling"></div>
+                                        <div class="col-md-6"><label class="form-label">Missing PO Number?</label><input type="text" class="form-control" x-model="form.missing_po_number"></div>
+                                        <div class="col-md-6"><label class="form-label">Non-Matched PO Processing?</label><input type="text" class="form-control" x-model="form.non_matched_po_processing"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="accordion-item">
+                                <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#glSection">Accounting Coding & GL</button></h2>
+                                <div id="glSection" class="accordion-collapse collapse">
+                                    <div class="accordion-body row g-3">
+                                        <div class="col-md-6"><label class="form-label">Custom GL Logic?</label><select class="form-select" x-model="form.custom_gl_logic"><option value="">Select...</option><option value="Yes">Yes</option><option value="No">No</option><option value="Partially">Partially</option></select></div>
+                                        <div class="col-12"><label class="form-label">Mandatory Posting Attributes</label><div class="d-flex flex-wrap gap-3"><template x-for="opt in ['Tax Code', 'GL Account', 'Cost Center', 'Internal Order', 'WBS', 'Profit Center', 'Other']" :key="opt"><div class="form-check"><input class="form-check-input" type="checkbox" :id="'mandPost_'+opt.replace(/\s+/g, '')" :checked="form.mandatory_posting_attributes.includes(opt)" @change="toggleArrayItem(form.mandatory_posting_attributes, opt)"><label class="form-check-label" :for="'mandPost_'+opt.replace(/\s+/g, '')" x-text="opt"></label></div></template></div></div>
+                                        <div class="col-md-6"><label class="form-label">Accounting Templates Usage?</label><input type="text" class="form-control" x-model="form.accounting_templates_usage"></div>
+                                        <div class="col-md-6"><label class="form-label">GL/Costcenter Assignment?</label><input type="text" class="form-control" x-model="form.gl_costcenter_assignment"></div>
+                                        <div class="col-md-6"><label class="form-label">Reviewer/Approver Derivation?</label><input type="text" class="form-control" x-model="form.reviewer_approver_derivation"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="accordion-item">
+                                <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#kpiSection">KPIs & Success Measurement</button></h2>
+                                <div id="kpiSection" class="accordion-collapse collapse">
+                                    <div class="accordion-body row g-3">
+                                        <div class="col-md-6"><label class="form-label">Current KPIs?</label><textarea class="form-control" x-model="form.current_kpis" rows="2"></textarea></div>
+                                        <div class="col-md-6"><label class="form-label">Verification Team KPIs?</label><textarea class="form-control" x-model="form.verification_team_kpis" rows="2"></textarea></div>
+                                        <div class="col-12"><label class="form-label">Special Document Handling?</label><textarea class="form-control" x-model="form.special_document_handling" rows="2"></textarea></div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
                         <div class="mt-2">
-                            <button type="submit" class="btn" :class="isEditing ? 'btn-warning' : 'btn-primary'" x-text="isEditing ? 'Update Project' : 'Create Project'"></button>
+                            <button type="submit" class="btn btn-lg" :class="isEditing ? 'btn-warning' : 'btn-primary'" x-text="isEditing ? 'Update Project' : 'Create Project'"></button>
                             <button type="button" class="btn btn-secondary" x-show="isEditing" @click="resetForm()">Cancel</button>
                         </div>
                     </form>
@@ -128,11 +459,11 @@
                             <thead class="table-light">
                                 <tr>
                                     <th>Name</th>
+                                    <th>Status</th>
                                     <th>Customer</th>
                                     <th>Type</th>
                                     <th>Start Date</th>
-                                    <th>Integration</th>
-                                    <th style="width: 200px;">Actions</th>
+                                    <th style="width: 150px;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -141,15 +472,14 @@
                                 <template x-for="proj in projects" :key="proj.id">
                                     <tr>
                                         <td class="fw-semibold" x-text="proj.name"></td>
+                                        <td>
+                                            <span class="badge text-capitalize" :class="proj.status === 'draft' ? 'bg-secondary' : (proj.status === 'completed' ? 'bg-success' : 'bg-dark')" x-text="proj.status"></span>
+                                        </td>
                                         <td x-text="getOrgName(proj.customer_id)"></td>
                                         <td><span class="badge text-capitalize bg-info" x-text="proj.type.replace('_', ' ')"></span></td>
                                         <td x-text="proj.start_date"></td>
                                         <td>
-                                            <span x-show="proj.requires_integration" class="badge bg-warning text-dark text-capitalize" x-text="proj.integration_type.replace('_', ' ')"></span>
-                                            <span x-show="!proj.requires_integration" class="text-muted">None</span>
-                                        </td>
-                                        <td>
-                                            <button class="btn btn-sm btn-outline-success" @click="openProject(proj)">👥 Stakeholders</button>
+                                            <button class="btn btn-sm btn-outline-success" @click="openProject(proj)">📂 Open</button>
                                             <button class="btn btn-sm btn-outline-warning" @click="editProject(proj)">Edit</button>
                                             <button class="btn btn-sm btn-outline-danger" @click="deleteProject(proj)">Del</button>
                                         </td>
@@ -163,76 +493,271 @@
         </div>
 
         <!-- ========================================== -->
-        <!-- VIEW 2: STAKEHOLDER MANAGEMENT            -->
+        <!-- VIEW 2: PROJECT DETAIL (TABS)             -->
         <!-- ========================================== -->
         <div x-show="selectedProject" x-transition>
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1 class="mb-0">Stakeholders: <span x-text="selectedProject?.name" class="text-primary"></span></h1>
+                <h1 class="mb-0">Project: <span x-text="selectedProject?.name" class="text-primary"></span></h1>
                 <button class="btn btn-outline-secondary" @click="closeProject()">← Back to Projects</button>
             </div>
 
-            <div class="row">
-                <!-- Add Stakeholder Form -->
-                <div class="col-md-4">
-                    <div class="card shadow-sm">
-                        <div class="card-header bg-white"><h5 class="mb-0">Add Stakeholder</h5></div>
-                        <div class="card-body">
-                            <form @submit.prevent="addStakeholder()">
-                                <div class="mb-3">
-                                    <label class="form-label">Select User</label>
-                                    <select class="form-select" x-model="stakeholderForm.user_id" required>
-                                        <option value="" disabled>Choose User...</option>
-                                        <template x-for="u in users" :key="u.id">
-                                            <option :value="u.id" x-text="u.first_name + ' ' + u.last_name"></option>
-                                        </template>
-                                    </select>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Role (Optional)</label>
-                                    <input type="text" class="form-control" x-model="stakeholderForm.role" placeholder="e.g., Project Manager">
-                                </div>
-                                <button type="submit" class="btn btn-primary w-100">Assign to Project</button>
-                            </form>
+            <ul class="nav nav-tabs mb-4">
+                <li class="nav-item">
+                    <a class="nav-link" :class="activeTab === 'stakeholders' ? 'active' : ''" href="#" @click.prevent="activeTab = 'stakeholders'">👥 Stakeholders</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" :class="activeTab === 'documents' ? 'active' : ''" href="#" @click.prevent="activeTab = 'documents'">📄 Documents</a>
+                </li>
+            </ul>
+
+            <!-- TAB 1: STAKEHOLDERS -->
+            <div x-show="activeTab === 'stakeholders'">
+                <div class="row">
+                    <div class="col-md-5">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-white"><h5 class="mb-0">Add Stakeholder</h5></div>
+                            <div class="card-body">
+                                <form @submit.prevent="addStakeholder()">
+                                    <div class="mb-3">
+                                        <label class="form-label">Select User</label>
+                                        <select class="form-select" x-model="stakeholderForm.user_id" required>
+                                            <option value="" disabled>Choose User...</option>
+                                            <template x-for="u in users" :key="u.id">
+                                                <option :value="u.id" x-text="u.first_name + ' ' + u.last_name + ' (' + u.email + ')'"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Role</label>
+                                        <select class="form-select" x-model="stakeholderForm.role" required>
+                                            <option value="" disabled>Select Role...</option>
+                                            <optgroup label="Customer Team">
+                                                <option value="project_sponsor">Project Sponsor</option>
+                                                <option value="project_lead">Project Lead</option>
+                                                <option value="business_lead">Business Lead</option>
+                                                <option value="technical_lead">Technical Lead</option>
+                                                <option value="accounts_payable_lead">AP Accountants Lead</option>
+                                                <option value="project_champion">Project Champion</option>
+                                                <option value="clerk">Clerk</option>
+                                            </optgroup>
+                                            <optgroup label="Hypatos Team">
+                                                <option value="account_executive">Account Executive</option>
+                                                <option value="solution_architect">Solution Architect</option>
+                                                <option value="project_manager">Project Manager</option>
+                                                <option value="customer_success_manager">Customer Success Manager</option>
+                                                <option value="head_of_professional_service">Head of Professional Service</option>
+                                            </optgroup>
+                                            <optgroup label="Other">
+                                                <option value="integration_expert">Integration Expert</option>
+                                                <option value="business_analyst">Business Analyst</option>
+                                                <option value="sap_basis">SAP Basis</option>
+                                                <option value="accountant">Accountant</option>
+                                                <option value="coe">COE</option>
+                                            </optgroup>
+                                        </select>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100">Assign to Project</button>
+                                </form>
+                            </div>
                         </div>
                     </div>
-                </div>
-
-                <!-- Current Stakeholders Table -->
-                <div class="col-md-8">
-                    <div class="card shadow-sm">
-                        <div class="card-header bg-white"><h5 class="mb-0">Current Stakeholders</h5></div>
-                        <div class="card-body p-0">
-                            <div class="table-responsive">
-                                <table class="table table-hover align-middle mb-0">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>User Name</th>
-                                            <th>Role</th>
-                                            <th style="width: 100px;">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr x-show="loadingStakeholders"><td colspan="3" class="text-center text-muted py-4">Loading...</td></tr>
-                                        <tr x-show="!loadingStakeholders && stakeholders.length === 0"><td colspan="3" class="text-center text-muted py-4">No stakeholders assigned.</td></tr>
-                                        <template x-for="sh in stakeholders" :key="sh.user_id">
+                    <div class="col-md-7">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Current Stakeholders</h5>
+                                <span class="badge bg-secondary" x-text="stakeholders.length + ' assigned'"></span>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle mb-0">
+                                        <thead class="table-light">
                                             <tr>
-                                                <td class="fw-semibold" x-text="getUserName(sh.user_id)"></td>
-                                                <td x-text="sh.role || '—'"></td>
-                                                <td>
-                                                    <button class="btn btn-sm btn-outline-danger" @click="removeStakeholder(sh.user_id)">Remove</button>
-                                                </td>
+                                                <th>User Name</th>
+                                                <th>Email</th>
+                                                <th>Role</th>
+                                                <th style="width: 100px;">Action</th>
                                             </tr>
-                                        </template>
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody>
+                                            <tr x-show="loadingStakeholders"><td colspan="4" class="text-center text-muted py-4">Loading...</td></tr>
+                                            <tr x-show="!loadingStakeholders && stakeholders.length === 0"><td colspan="4" class="text-center text-muted py-4">No stakeholders assigned.</td></tr>
+                                            <template x-for="sh in stakeholders" :key="sh.user_id">
+                                                <tr>
+                                                    <td class="fw-semibold" x-text="sh.first_name + ' ' + sh.last_name"></td>
+                                                    <td class="small text-muted" x-text="sh.email"></td>
+                                                    <td>
+                                                        <span class="badge badge-role" :class="getRoleBadgeClass(sh.role)" x-text="formatRoleName(sh.role)"></span>
+                                                    </td>
+                                                    <td><button class="btn btn-sm btn-outline-danger" @click="removeStakeholder(sh.user_id)">Remove</button></td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-    </main>
+            <!-- TAB 2: DOCUMENTS -->
+            <div x-show="activeTab === 'documents'">
+                <div class="row">
+                    <div class="col-md-5">
+                        <div class="card shadow-sm mb-3">
+                            <div class="card-header bg-white"><h5 class="mb-0">Generate Documents</h5></div>
+                            <div class="card-body">
+                                <p class="text-muted small mb-3">
+                                    Ensure all project details and stakeholders are configured before generating. 
+                                    This will create SOW, Success Contract, and Solution Design documents.
+                                </p>
+                                
+                                <div class="mb-3">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="bi me-2" :class="selectedProject?.primary_usecase_id ? 'bi-check-circle-fill text-success' : 'bi-x-circle text-danger'"></i>
+                                        <small :class="selectedProject?.primary_usecase_id ? 'text-success' : 'text-danger'">Primary Usecase assigned</small>
+                                    </div>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="bi me-2" :class="stakeholders.length > 0 ? 'bi-check-circle-fill text-success' : 'bi-x-circle text-danger'"></i>
+                                        <small :class="stakeholders.length > 0 ? 'text-success' : 'text-danger'">At least 1 stakeholder assigned</small>
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi me-2" :class="selectedProject?.go_live_date ? 'bi-check-circle-fill text-success' : 'bi-x-circle text-warning'"></i>
+                                        <small :class="selectedProject?.go_live_date ? 'text-success' : 'text-warning'">Go-live date specified</small>
+                                    </div>
+                                </div>
+
+                                <button 
+                                    class="btn btn-lg w-100" 
+                                    :class="generatingDocs ? 'btn-secondary' : 'btn-primary'" 
+                                    @click="generateDocuments()" 
+                                    :disabled="generatingDocs || !selectedProject?.primary_usecase_id || stakeholders.length === 0">
+                                    <template x-if="!generatingDocs">
+                                        <span><i class="bi bi-file-earmark-arrow-down me-2"></i> Generate All Documents</span>
+                                    </template>
+                                    <template x-if="generatingDocs">
+                                        <span><span class="spinner-border spinner-border-sm me-2"></span> Generating...</span>
+                                    </template>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="card shadow-sm" x-show="selectedProject">
+                            <div class="card-header bg-white"><h6 class="mb-0">Project Summary</h6></div>
+                            <div class="card-body small">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="text-muted">Type</span>
+                                    <strong class="text-capitalize" x-text="selectedProject?.type?.replace('_', ' ')"></strong>
+                                </div>
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="text-muted">Customer</span>
+                                    <strong x-text="getOrgName(selectedProject?.customer_id)"></strong>
+                                </div>
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="text-muted">Usecase</span>
+                                    <strong x-text="getUsecaseName(selectedProject?.primary_usecase_id)"></strong>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-muted">Status</span>
+                                    <span class="badge text-capitalize" :class="selectedProject?.status === 'completed' ? 'bg-success' : 'bg-secondary'" x-text="selectedProject?.status"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ========== GENERATED DOCUMENTS WITH DOWNLOAD ========== -->
+                    <div class="col-md-7">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Generated Documents</h5>
+                                <span class="badge bg-primary" x-show="docCount > 0" x-text="docCount + ' documents'"></span>
+                            </div>
+                            <div class="card-body">
+                                <!-- Empty state -->
+                                <div x-show="docCount === 0" class="text-center text-muted py-5">
+                                    <i class="bi bi-file-earmark-text fs-1 d-block mb-2"></i>
+                                    <p class="mb-0">No documents generated yet.</p>
+                                    <small>Click "Generate All Documents" to create project documents.</small>
+                                </div>
+
+                                <!-- Document list with download buttons -->
+                                <div x-show="docCount > 0" class="row g-3">
+                                    
+                                    <!-- SOW Markdown -->
+                                    <div class="col-md-6" x-show="selectedProject?.sow_markdown_path || generatedDocs.sow">
+                                        <div class="card doc-card border-success h-100">
+                                            <div class="card-body text-center p-3">
+                                                <i class="bi bi-filetype-md text-primary fs-2 d-block mb-2"></i>
+                                                <h6 class="mb-1">Statement of Work</h6>
+                                                <small class="text-muted d-block mb-2">Markdown</small>
+                                                <span class="badge bg-success mb-2 d-block"><i class="bi bi-check-lg me-1"></i>Generated</span>
+                                                <a :href="getDownloadUrl('sow')" class="btn btn-sm btn-outline-primary w-100" download>
+                                                    <i class="bi bi-download me-1"></i> Download .md
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- SOW Word -->
+                                    <div class="col-md-6" x-show="selectedProject?.sow_docx_path || generatedDocs.sow_docx">
+                                        <div class="card doc-card border-success h-100">
+                                            <div class="card-body text-center p-3">
+                                                <i class="bi bi-file-earmark-word text-primary fs-2 d-block mb-2"></i>
+                                                <h6 class="mb-1">Statement of Work</h6>
+                                                <small class="text-muted d-block mb-2">Word Document</small>
+                                                <span class="badge bg-success mb-2 d-block"><i class="bi bi-check-lg me-1"></i>Generated</span>
+                                                <a :href="getDownloadUrl('sow_docx')" class="btn btn-sm btn-outline-primary w-100" download>
+                                                    <i class="bi bi-download me-1"></i> Download .docx
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Success Contract -->
+                                    <div class="col-md-6" x-show="selectedProject?.success_contract_path || generatedDocs.success_contract">
+                                        <div class="card doc-card border-success h-100">
+                                            <div class="card-body text-center p-3">
+                                                <i class="bi bi-filetype-md text-success fs-2 d-block mb-2"></i>
+                                                <h6 class="mb-1">Success Contract</h6>
+                                                <small class="text-muted d-block mb-2">Markdown</small>
+                                                <span class="badge bg-success mb-2 d-block"><i class="bi bi-check-lg me-1"></i>Generated</span>
+                                                <a :href="getDownloadUrl('success_contract')" class="btn btn-sm btn-outline-success w-100" download>
+                                                    <i class="bi bi-download me-1"></i> Download .md
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Solution Design -->
+                                    <div class="col-md-6" x-show="selectedProject?.solution_design_path || generatedDocs.solution_design">
+                                        <div class="card doc-card border-success h-100">
+                                            <div class="card-body text-center p-3">
+                                                <i class="bi bi-filetype-md text-info fs-2 d-block mb-2"></i>
+                                                <h6 class="mb-1">Solution Design</h6>
+                                                <small class="text-muted d-block mb-2">Markdown</small>
+                                                <span class="badge bg-success mb-2 d-block"><i class="bi bi-check-lg me-1"></i>Generated</span>
+                                                <a :href="getDownloadUrl('solution_design')" class="btn btn-sm btn-outline-info w-100" download>
+                                                    <i class="bi bi-download me-1"></i> Download .md
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Generation info -->
+                                <div x-show="docCount > 0" class="mt-3 pt-3 border-top">
+                                    <small class="text-muted">
+                                        <i class="bi bi-folder me-1"></i> 
+                                        Documents saved to: <code>generated_documents/<span x-text="selectedProject?.id?.substring(0,8) + '...'"></span>/</code>
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -240,127 +765,284 @@
 <script>
     function projectManager() {
         return {
-            projects: [], organizations: [], users: [], loading: true, isEditing: false,
-            form: { id: '', name: '', type: 'pilot', start_date: '', customer_id: '', deal_winner_id: '', default_duration_weeks: 4, requires_integration: false, integration_type: 'none', partner_budget_hours: 0, internal_budget_hours: 0 },
+            projects: [], organizations: [], users: [], usecases: [], loading: true, isEditing: false,
             
-            // Stakeholder state
-            selectedProject: null,
-            stakeholders: [],
-            stakeholderForm: { user_id: '', role: '' },
-            loadingStakeholders: false,
+            objectiveInput: '',
+            criteriaInput: '',
+            docTypeInput: { document_name: '', accuracy_target: 95 },
+            generatingDocs: false,
+            generatedDocs: {},
+
+            form: { 
+                id: '', name: '', type: 'pilot', status: 'draft', start_date: '', customer_id: '', deal_winner_id: '', primary_usecase_id: '',
+                default_duration_weeks: 4, requires_integration: 'false', integration_type: 'none', 
+                partner_budget_hours: 0, internal_budget_hours: 0,
+                go_live_date: '', go_live_regions: '', rollout_regions: '',
+                project_background: '', main_objectives: [], top_three_pain_points: '',
+                language_constraints: '', project_risks: '', overall_accuracy_target: null,
+                success_criteria: [], success_criteria_custom: '', document_types: [],
+                annual_doc_volume_per_usecase: null, e2e_cost_per_doc: null,
+                e2e_processing_time_mins: null, automation_improvement_percentage: null,
+                approx_supplier_customer_count: null,
+                target_erp: '', number_erp_systems: '', sap_addon_concerns: '', current_workflow: '', existing_services: '',
+                document_receipt_channels: [], data_points_current: '', current_process_overview: '',
+                users_work_in_studio: '', supplier_guidelines: '', other_processing_guidelines: '',
+                multi_invoice_documents: '', multi_invoice_share: '', poor_quality_scans: '',
+                file_formats_received: [], document_submission_channels: [], expected_doc_types_in_channels: '', 
+                out_of_scope_handling: '', scanning_method: '', barcoding_separation: '', classify_during_scan: '',
+                email_content_downstream: '', eml_archiving: '', inbound_email_rules: '', email_routing: '',
+                document_classification_method: '', statements_classification: '', statements_downstream: '', leases_recurring_handling: '',
+                po_nonpo_identification: '', po_nonpo_distribution: '', rejection_classification: '', rejection_timing: '',
+                rejection_communication: '', standardized_rejection_messages: '', bounced_rejections_handling: '',
+                verification_team_structure: '', routing_criteria: '', master_data_assignment: '', missing_master_data_handling: '', duplicate_master_data: '',
+                delivery_note_extraction: '', po_types_common: [], po_vs_invoice_values: '', po_deviation_handling: '',
+                missing_po_number: '', non_matched_po_processing: '',
+                custom_gl_logic: '', mandatory_posting_attributes: [], accounting_templates_usage: '', gl_costcenter_assignment: '', reviewer_approver_derivation: '',
+                current_kpis: '', verification_team_kpis: '', special_document_handling: ''
+            },
+            
+            selectedProject: null, activeTab: 'stakeholders',
+            stakeholders: [], stakeholderForm: { user_id: '', role: '' }, loadingStakeholders: false,
+            selectedUsecaseFeatures: [],
 
             apiBase: "/project",
             orgApi: "/organization",
             userApi: "/user",
+            usecaseApi: "/usecase",
 
-            async initData() {
-                await Promise.all([this.fetchOrganizations(), this.fetchUsers()]);
-                await this.fetchProjects();
+            get docCount() {
+                let count = 0;
+                if (this.selectedProject?.sow_markdown_path || this.generatedDocs.sow) count++;
+                if (this.selectedProject?.sow_docx_path || this.generatedDocs.sow_docx) count++;
+                if (this.selectedProject?.success_contract_path || this.generatedDocs.success_contract) count++;
+                if (this.selectedProject?.solution_design_path || this.generatedDocs.solution_design) count++;
+                return count;
             },
 
-            async fetchProjects() {
-                this.loading = true;
-                try { const res = await fetch(`${this.apiBase}/projects`); if (!res.ok) throw new Error(); this.projects = await res.json(); }
-                catch (e) { alert("Error fetching projects"); } finally { this.loading = false; }
+            // ========== DOWNLOAD URL BUILDER ==========
+            getDownloadUrl(documentType) {
+                if (!this.selectedProject?.id) return '#';
+                return `${this.apiBase}/${this.selectedProject.id}/download/${documentType}`;
             },
 
-            async fetchOrganizations() {
-                try { const res = await fetch(`${this.orgApi}/organizations`); if (!res.ok) throw new Error(); this.organizations = await res.json(); } catch (e) {}
+            // ========== FILL STATIC DATA ==========
+            fillStaticData() {
+                if (this.isEditing) return;
+
+                const firstOrg = this.organizations.length > 0 ? this.organizations[0].id : '';
+                const firstUser = this.users.length > 0 ? this.users[0].id : '';
+                const firstUsecase = this.usecases.length > 0 ? this.usecases[0].id : '';
+
+                const today = new Date();
+                const startDate = today.toISOString().substring(0, 10);
+                const goLiveDate = new Date(today.getTime() + 12 * 7 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10);
+
+                this.form = {
+                    id: '',
+                    name: 'Continental Automotive AP Automation Pilot',
+                    type: 'pilot',
+                    status: 'draft',
+                    start_date: startDate,
+                    customer_id: firstOrg,
+                    deal_winner_id: firstUser,
+                    primary_usecase_id: firstUsecase,
+                    default_duration_weeks: 12,
+                    requires_integration: 'true',
+                    integration_type: 'sap_cloud_connector',
+                    partner_budget_hours: 160,
+                    internal_budget_hours: 80,
+                    go_live_date: goLiveDate,
+                    go_live_regions: 'Germany, Austria, Switzerland',
+                    rollout_regions: 'France, Spain, Italy (Phase 2 — Q3 2025)',
+                    project_background: 'Continental Automotive currently processes over 180,000 supplier invoices per year across 3 ERP systems, with the majority handled through manual data entry. The AP team of 22 clerks spends significant time on repetitive keystroke tasks, leading to an average error rate of 4.2% and slow processing times. This pilot project aims to automate invoice capture, classification, and data extraction using Hypatos AI, integrating directly with their SAP S/4HANA landscape via SAP Cloud Connector.',
+                    main_objectives: [
+                        'Achieve 95%+ straight-through processing rate for standard PO-based invoices',
+                        'Reduce average end-to-end processing time from 12 minutes to under 2 minutes per document',
+                        'Eliminate manual data entry errors on extracted header and line-item fields',
+                        'Enable automatic PO matching for at least 80% of inbound invoices',
+                        'Establish a scalable foundation for rollout to additional regions and document types'
+                    ],
+                    top_three_pain_points: '1. Manual keying of invoice data is slow and error-prone — 4.2% error rate leads to rework and payment delays\n2. No visibility into invoice processing status — approvers lack a centralized tracking mechanism\n3. High exception handling cost — non-PO and mismatched invoices require senior accountant review at $45/hr',
+                    language_constraints: 'German required',
+                    project_risks: 'Legacy data quality in older SAP ECC system may affect initial extraction accuracy. Change management across 3 regional AP teams could delay adoption. Resource availability of SAP Basis team for Cloud Connector setup is limited in Q1.',
+                    overall_accuracy_target: 95,
+                    success_criteria: [
+                        '95%+ field-level extraction accuracy on invoice header data (vendor, date, amount, PO number)',
+                        '90%+ line-item extraction accuracy for PO-based invoices',
+                        '80%+ automatic PO match rate for invoices with a valid PO reference',
+                        'End-to-end processing time under 2 minutes for straight-through invoices',
+                        'Zero production outages during the 4-week pilot period'
+                    ],
+                    success_criteria_custom: 'Customer wants a live dashboard showing real-time STP rate, exception count, and average processing time accessible to AP team lead and management.',
+                    document_types: [
+                        { document_name: 'Invoice', accuracy_target: 96 },
+                        { document_name: 'Credit Note', accuracy_target: 92 },
+                        { document_name: 'Delivery Note', accuracy_target: 88 },
+                        { document_name: 'Remittance Advice', accuracy_target: 90 }
+                    ],
+                    annual_doc_volume_per_usecase: 180000,
+                    e2e_cost_per_doc: 12.50,
+                    e2e_processing_time_mins: 12,
+                    automation_improvement_percentage: 25,
+                    approx_supplier_customer_count: 2400,
+                    target_erp: 'SAP S/4HANA 2023',
+                    number_erp_systems: 3,
+                    sap_addon_concerns: 'Customer has strict change management policies for SAP transports. Addon installation requires 2-week lead time and Basis team availability.',
+                    current_workflow: 'Invoices arrive via email/portal → AP clerk manually enters data into SAP → 3-way match attempted → exceptions routed to senior accountant → approved and posted',
+                    existing_services: 'SAP Output Management, OpenText Archive Server, Custom ABAP validation programs',
+                    document_receipt_channels: ['Email', 'Portal', 'Manual Upload', 'Scan'],
+                    data_points_current: 'Vendor number, invoice number, invoice date, gross amount, net amount, tax amount, PO number, cost center, GL account',
+                    current_process_overview: '',
+                    users_work_in_studio: 'Users work in Studio',
+                    supplier_guidelines: 'Partial',
+                    other_processing_guidelines: 'Invoices above €50,000 require dual approval. Credit notes must be matched against original invoice before posting.',
+                    multi_invoice_documents: 'Sometimes',
+                    multi_invoice_share: 15,
+                    poor_quality_scans: 'Rarely',
+                    file_formats_received: ['PDF', 'PDF/A', 'TIFF', 'JPG', 'XML'],
+                    document_submission_channels: ['Email', 'Portal', 'Vendor Portal', 'Manual Upload'],
+                    expected_doc_types_in_channels: 'Email: Invoices, Credit Notes; Portal: Invoices, Delivery Notes; Vendor Portal: Invoices only',
+                    out_of_scope_handling: 'Manual review',
+                    scanning_method: '',
+                    barcoding_separation: '',
+                    classify_during_scan: '',
+                    email_content_downstream: 'Email body text is stored as metadata for audit trail; attachments are extracted and processed',
+                    eml_archiving: 'Yes',
+                    inbound_email_rules: 'Rules based on sender domain and subject line keywords; auto-forward from shared AP inbox',
+                    email_routing: 'Route by supplier region — DACH, Southern Europe, Other — to respective AP clerk queues',
+                    document_classification_method: 'AI-based classification with Hypatos out-of-the-box model, supplemented by keyword rules for edge cases',
+                    statements_classification: 'Statements are classified separately and routed to reconciliation team',
+                    statements_downstream: 'Exported as CSV to treasury reconciliation tool',
+                    leases_recurring_handling: 'Recurring lease invoices flagged and auto-matched to contract schedule',
+                    po_nonpo_identification: 'AI-based PO number detection on invoice; if no PO found, routed to non-PO workflow',
+                    po_nonpo_distribution: 'Approximately 70% PO-based, 30% non-PO',
+                    rejection_classification: 'Rejected invoices classified by reason: price mismatch, quantity mismatch, missing PO, duplicate',
+                    rejection_timing: 'Rejection triggered within 24 hours of receipt if auto-match fails',
+                    rejection_communication: 'Automated email to supplier with rejection reason and resubmission instructions',
+                    standardized_rejection_messages: 'Yes — 8 standardized rejection reason templates configured in German and English',
+                    bounced_rejections_handling: 'Bounced rejection emails trigger manual review by AP team lead',
+                    verification_team_structure: '3 regional AP teams: DACH (10 clerks), Southern Europe (7 clerks), Other (5 clerks). Each team has 1 senior lead.',
+                    routing_criteria: 'Supplier region and document type; PO invoices routed by matching PO cost center owner',
+                    master_data_assignment: 'Vendor master data pulled from SAP; auto-matched on VAT ID and vendor name',
+                    missing_master_data_handling: 'Flagged as exception; AP clerk creates vendor master record with approval from master data governance team',
+                    duplicate_master_data: 'Some',
+                    delivery_note_extraction: 'Sometimes',
+                    po_types_common: ['Standard PO', 'Service PO', 'Limit PO'],
+                    po_vs_invoice_values: 'Tolerance: ±2% on price, ±10% on quantity; beyond tolerance triggers manual review',
+                    po_deviation_handling: 'Minor deviations auto-approved within tolerance; major deviations routed to purchasing manager',
+                    missing_po_number: 'Routed to non-PO workflow with GL coding by AP clerk; escalated if over €10,000',
+                    non_matched_po_processing: 'Manual GL coding by senior accountant with cost center approval workflow',
+                    custom_gl_logic: 'Partially',
+                    mandatory_posting_attributes: ['Tax Code', 'GL Account', 'Cost Center', 'Profit Center'],
+                    accounting_templates_usage: 'Standard SAP account determination; 3 custom templates for inter-company postings',
+                    gl_costcenter_assignment: 'Derived from PO line item; non-PO derived from vendor master default + clerk override',
+                    reviewer_approver_derivation: 'Based on cost center manager in SAP HR org structure; amount-based escalation for invoices over €25,000',
+                    current_kpis: 'Average processing time: 12 min/doc; Error rate: 4.2%; STP rate: 18%; On-time payment rate: 82%',
+                    verification_team_kpis: 'Invoices processed per clerk per day: 35; Exception resolution time: 4.2 hours average; First-pass accuracy: 78%',
+                    special_document_handling: 'Inter-company invoices require dual-side posting. Construction invoices need WBS element coding. Government invoices must retain original PDF for 10-year compliance.'
+                };
+
+                if (firstUsecase) {
+                    this.loadUsecaseFeatures(firstUsecase);
+                }
+
+                const toastEl = document.getElementById('fillToast');
+                if (toastEl) {
+                    const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
+                    toast.show();
+                }
             },
 
-            async fetchUsers() {
-                try { const res = await fetch(`${this.userApi}/users`); if (!res.ok) throw new Error(); this.users = await res.json(); } catch (e) {}
+            addListItem(fieldName, value) { if (!value || !value.trim()) return; this.form[fieldName].push(value.trim()); },
+            removeListItem(fieldName, index) { this.form[fieldName].splice(index, 1); },
+            addDocType() {
+                if (!this.docTypeInput.document_name || !this.docTypeInput.document_name.trim()) return;
+                this.form.document_types.push({ document_name: this.docTypeInput.document_name.trim(), accuracy_target: parseInt(this.docTypeInput.accuracy_target) || 95 });
+                this.docTypeInput = { document_name: '', accuracy_target: 95 };
             },
+            toggleArrayItem(arr, item) { const index = arr.indexOf(item); if (index > -1) { arr.splice(index, 1); } else { arr.push(item); } },
+            formatRoleName(role) { if (!role) return '—'; return role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); },
+            getRoleBadgeClass(role) { if (!role) return 'bg-secondary'; const h = ['account_executive', 'solution_architect', 'project_manager', 'customer_success_manager', 'head_of_professional_service']; if (h.includes(role)) return 'bg-primary'; return 'bg-success'; },
+
+            async initData() { await Promise.all([this.fetchOrganizations(), this.fetchUsers(), this.fetchUsecases()]); await this.fetchProjects(); },
+            async fetchProjects() { this.loading = true; try { const res = await fetch(`${this.apiBase}/projects`); if (!res.ok) throw new Error(); this.projects = await res.json(); } catch (e) { alert("Error fetching projects"); } finally { this.loading = false; } },
+            async fetchOrganizations() { try { const res = await fetch(`${this.orgApi}/organizations`); if (!res.ok) throw new Error(); this.organizations = await res.json(); } catch (e) {} },
+            async fetchUsers() { try { const res = await fetch(`${this.userApi}/users`); if (!res.ok) throw new Error(); this.users = await res.json(); } catch (e) {} },
+            async fetchUsecases() { try { const res = await fetch(`${this.usecaseApi}/usecases`); if (!res.ok) throw new Error(); this.usecases = await res.json(); } catch (e) {} },
+            async loadUsecaseFeatures(usecaseId) { this.selectedUsecaseFeatures = []; if (!usecaseId) return; try { const res = await fetch(`${this.usecaseApi}/${usecaseId}/features`); if (!res.ok) throw new Error(); this.selectedUsecaseFeatures = await res.json(); } catch (e) { console.error("Error fetching features", e); } },
 
             async submitForm() {
                 let payload = JSON.parse(JSON.stringify(this.form));
+                payload.requires_integration = payload.requires_integration === 'true';
+                Object.keys(payload).forEach((k) => { if (payload[k] === "") payload[k] = null; });
+                const arrayFields = ['document_receipt_channels', 'file_formats_received', 'document_submission_channels', 'po_types_common', 'mandatory_posting_attributes', 'main_objectives', 'success_criteria', 'document_types'];
+                arrayFields.forEach(field => { if (!Array.isArray(payload[field])) payload[field] = []; });
                 if (!payload.requires_integration) payload.integration_type = "none";
+                ['overall_accuracy_target', 'annual_doc_volume_per_usecase', 'e2e_processing_time_mins', 'automation_improvement_percentage', 'approx_supplier_customer_count', 'number_erp_systems'].forEach(f => { if (payload[f] !== null && payload[f] !== undefined) payload[f] = Number(payload[f]); });
+                if (payload.e2e_cost_per_doc !== null && payload.e2e_cost_per_doc !== undefined) payload.e2e_cost_per_doc = parseFloat(payload.e2e_cost_per_doc);
 
                 try {
-                    if (this.isEditing) {
-                        const id = payload.id;
-                        Object.keys(payload).forEach((k) => { if (payload[k] === "" || payload[k] === null) delete payload[k]; });
-                        const res = await fetch(`${this.apiBase}/?id=${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-                        if (!res.ok) throw new Error();
-                    } else {
-                        delete payload.id;
-                        const res = await fetch(`${this.apiBase}/`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-                        if (!res.ok) throw new Error();
-                    }
+                    if (this.isEditing) { const id = payload.id; delete payload.id; const res = await fetch(`${this.apiBase}/?id=${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); if (!res.ok) { const err = await res.json(); throw new Error(err.detail || "Error"); } } 
+                    else { delete payload.id; const res = await fetch(`${this.apiBase}/`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); if (!res.ok) { const err = await res.json(); throw new Error(err.detail || "Error"); } }
                     this.resetForm(); await this.fetchProjects();
-                } catch (e) { alert("Error saving project"); }
+                } catch (e) { alert("Error saving project: " + e.message); }
             },
 
             editProject(proj) {
-                this.isEditing = true;
-                let editData = JSON.parse(JSON.stringify(proj));
+                this.isEditing = true; let editData = JSON.parse(JSON.stringify(proj));
                 if (editData.start_date && editData.start_date.length > 10) editData.start_date = editData.start_date.substring(0, 10);
+                if (editData.go_live_date && editData.go_live_date.length > 10) editData.go_live_date = editData.go_live_date.substring(0, 10);
+                const arrayFields = ['document_receipt_channels', 'file_formats_received', 'document_submission_channels', 'po_types_common', 'mandatory_posting_attributes', 'main_objectives', 'success_criteria', 'document_types'];
+                arrayFields.forEach(field => { editData[field] = Array.isArray(editData[field]) ? editData[field] : []; });
+                editData.requires_integration = editData.requires_integration ? 'true' : 'false';
                 this.form = editData;
+                if (editData.primary_usecase_id) { this.loadUsecaseFeatures(editData.primary_usecase_id); }
             },
 
-            async deleteProject(proj) {
-                if (!confirm(`Delete ${proj.name}?`)) return;
-                try { await fetch(`${this.apiBase}/?id=${proj.id}`, { method: "DELETE" }); await this.fetchProjects(); }
-                catch (e) { alert("Error deleting"); }
-            },
+            async deleteProject(proj) { if (!confirm(`Delete ${proj.name}?`)) return; try { await fetch(`${this.apiBase}/?id=${proj.id}`, { method: "DELETE" }); await this.fetchProjects(); } catch (e) { alert("Error deleting"); } },
 
             resetForm() {
-                this.isEditing = false;
-                this.form = { id: '', name: '', type: 'pilot', start_date: '', customer_id: '', deal_winner_id: '', default_duration_weeks: 4, requires_integration: false, integration_type: 'none', partner_budget_hours: 0, internal_budget_hours: 0 };
+                this.isEditing = false; this.selectedUsecaseFeatures = []; this.objectiveInput = ''; this.criteriaInput = ''; this.docTypeInput = { document_name: '', accuracy_target: 95 };
+                this.form = { id: '', name: '', type: 'pilot', status: 'draft', start_date: '', customer_id: '', deal_winner_id: '', primary_usecase_id: '', default_duration_weeks: 4, requires_integration: 'false', integration_type: 'none', partner_budget_hours: 0, internal_budget_hours: 0, go_live_date: '', go_live_regions: '', rollout_regions: '', project_background: '', main_objectives: [], top_three_pain_points: '', language_constraints: '', project_risks: '', overall_accuracy_target: null, success_criteria: [], success_criteria_custom: '', document_types: [], annual_doc_volume_per_usecase: null, e2e_cost_per_doc: null, e2e_processing_time_mins: null, automation_improvement_percentage: null, approx_supplier_customer_count: null, target_erp: '', number_erp_systems: '', sap_addon_concerns: '', current_workflow: '', existing_services: '', document_receipt_channels: [], data_points_current: '', current_process_overview: '', users_work_in_studio: '', supplier_guidelines: '', other_processing_guidelines: '', multi_invoice_documents: '', multi_invoice_share: '', poor_quality_scans: '', file_formats_received: [], document_submission_channels: [], expected_doc_types_in_channels: '', out_of_scope_handling: '', scanning_method: '', barcoding_separation: '', classify_during_scan: '', email_content_downstream: '', eml_archiving: '', inbound_email_rules: '', email_routing: '', document_classification_method: '', statements_classification: '', statements_downstream: '', leases_recurring_handling: '', po_nonpo_identification: '', po_nonpo_distribution: '', rejection_classification: '', rejection_timing: '', rejection_communication: '', standardized_rejection_messages: '', bounced_rejections_handling: '', verification_team_structure: '', routing_criteria: '', master_data_assignment: '', missing_master_data_handling: '', duplicate_master_data: '', delivery_note_extraction: '', po_types_common: [], po_vs_invoice_values: '', po_deviation_handling: '', missing_po_number: '', non_matched_po_processing: '', custom_gl_logic: '', mandatory_posting_attributes: [], accounting_templates_usage: '', gl_costcenter_assignment: '', reviewer_approver_derivation: '', current_kpis: '', verification_team_kpis: '', special_document_handling: '' };
             },
 
-            // ==================== Stakeholder Methods ====================
-            
             async openProject(proj) {
-                this.selectedProject = proj;
-                this.stakeholderForm = { user_id: '', role: '' };
+                this.selectedProject = proj; this.activeTab = 'stakeholders'; this.stakeholderForm = { user_id: '', role: '' }; this.generatedDocs = {};
                 await this.fetchStakeholders(proj.id);
             },
+            closeProject() { this.selectedProject = null; this.stakeholders = []; },
 
-            closeProject() {
-                this.selectedProject = null;
-                this.stakeholders = [];
-            },
+            async fetchStakeholders(projectId) { this.loadingStakeholders = true; try { const res = await fetch(`${this.apiBase}/${projectId}/stakeholders`); if (!res.ok) throw new Error(); this.stakeholders = await res.json(); } catch (e) { alert("Error fetching stakeholders"); } finally { this.loadingStakeholders = false; } },
+            async addStakeholder() { if (!this.selectedProject || !this.stakeholderForm.user_id || !this.stakeholderForm.role) return; try { const res = await fetch(`${this.apiBase}/${this.selectedProject.id}/stakeholder`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(this.stakeholderForm) }); if (!res.ok) { const err = await res.json(); throw new Error(err.detail || "Error assigning stakeholder"); } this.stakeholderForm = { user_id: '', role: '' }; await this.fetchStakeholders(this.selectedProject.id); } catch (e) { alert(e.message); } },
+            async removeStakeholder(userId) { if (!confirm("Remove this stakeholder?")) return; try { await fetch(`${this.apiBase}/${this.selectedProject.id}/stakeholder/${userId}`, { method: "DELETE" }); await this.fetchStakeholders(this.selectedProject.id); } catch (e) { alert("Error removing stakeholder"); } },
 
-            async fetchStakeholders(projectId) {
-                this.loadingStakeholders = true;
+            async generateDocuments() {
+                if (!this.selectedProject) return;
+                if (!confirm("Generate all project documents? This may take a moment.")) return;
+                
+                this.generatingDocs = true;
                 try {
-                    const res = await fetch(`${this.apiBase}/${projectId}/stakeholders`);
-                    if (!res.ok) throw new Error();
-                    this.stakeholders = await res.json();
-                } catch (e) { alert("Error fetching stakeholders"); } 
-                finally { this.loadingStakeholders = false; }
+                    const res = await fetch(`${this.apiBase}/${this.selectedProject.id}/generate-documents`, { method: "POST" });
+                    if (!res.ok) { const err = await res.json(); throw new Error(err.detail || "Error generating documents"); }
+                    const data = await res.json();
+                    this.generatedDocs = data.paths || {};
+                    
+                    this.selectedProject.status = 'completed';
+                    this.selectedProject.sow_markdown_path = this.generatedDocs.sow;
+                    this.selectedProject.sow_docx_path = this.generatedDocs.sow_docx;
+                    this.selectedProject.success_contract_path = this.generatedDocs.success_contract;
+                    this.selectedProject.solution_design_path = this.generatedDocs.solution_design;
+                    
+                    await this.fetchProjects();
+                } catch (e) { 
+                    alert("Error generating documents: " + e.message); 
+                } finally { 
+                    this.generatingDocs = false; 
+                }
             },
 
-            async addStakeholder() {
-                if (!this.selectedProject || !this.stakeholderForm.user_id) return;
-                try {
-                    const res = await fetch(`${this.apiBase}/${this.selectedProject.id}/stakeholder`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(this.stakeholderForm)
-                    });
-                    if (!res.ok) {
-                        const err = await res.json();
-                        throw new Error(err.detail || "Error assigning stakeholder");
-                    }
-                    this.stakeholderForm = { user_id: '', role: '' }; // Reset form
-                    await this.fetchStakeholders(this.selectedProject.id); // Refresh list
-                } catch (e) { alert(e.message); }
-            },
-
-            async removeStakeholder(userId) {
-                if (!confirm("Remove this stakeholder from the project?")) return;
-                try {
-                    const res = await fetch(`${this.apiBase}/${this.selectedProject.id}/stakeholder/${userId}`, { method: "DELETE" });
-                    if (!res.ok) throw new Error();
-                    await this.fetchStakeholders(this.selectedProject.id); // Refresh list
-                } catch (e) { alert("Error removing stakeholder"); }
-            },
-
-            // ==================== Helpers ====================
             getOrgName(id) { const org = this.organizations.find(o => o.id === id); return org ? org.name : id; },
-            getUserName(id) { const user = this.users.find(u => u.id === id); return user ? `${user.first_name} ${user.last_name}` : id; }
+            getUsecaseName(id) { const uc = this.usecases.find(u => u.id === id); return uc ? uc.name : id; }
         }
     }
 </script>
