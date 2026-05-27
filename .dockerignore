@@ -5,6 +5,6 @@ __pycache__/
 
 venv/
 migrations
-alembic.ini\
+alembic.ini
 .env
 .env.sample
