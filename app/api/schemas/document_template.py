@@ -6,6 +6,7 @@ from datetime import datetime
 
 # ===================== Schemas =====================
 class DocumentTemplateBase(BaseModel):
+    file_format: str = "md"  # 🆕 "md" or "docx"
     name: str
     type: DocumentTemplateType
     markdown_content: str
@@ -24,9 +25,11 @@ class DocumentTemplateUpdate(BaseModel):
     variables: Optional[list[str]] = None
     version: Optional[int] = None
     is_active: Optional[bool] = None
+    file_format: Optional[str] = None  # 🆕
     created_by_id: Optional[UUID] = None
 
 class DocumentTemplateRead(DocumentTemplateBase):
     id: UUID
+    file_path: Optional[str] = None  # 🆕
     created_at: datetime
     updated_at: datetime

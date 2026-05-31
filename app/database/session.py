@@ -6,11 +6,11 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from app.config import settings
 
-
+print(settings.POSTGRESQL_URL)
 
 engine = create_async_engine(
     url = settings.POSTGRESQL_URL,
-    echo = True,
+    echo = False,
     connect_args={
         "statement_cache_size": 0
     }

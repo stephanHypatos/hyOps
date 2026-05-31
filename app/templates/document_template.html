@@ -5,15 +5,135 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document Templates</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
-        .sidebar { width: 260px; min-height: 100vh; }
+        .sidebar { 
+            width: 260px; 
+            min-width: 260px; 
+            flex-shrink: 0; 
+            min-height: 100vh; 
+        }
         .sidebar .nav-link { color: rgba(255, 255, 255, 0.75); border-radius: 5px; margin-bottom: 5px; }
         .sidebar .nav-link:hover { color: #fff; background-color: rgba(255, 255, 255, 0.1); }
         .sidebar .nav-link.active { color: #fff; background-color: #0d6efd; }
         .sidebar .submenu { padding-left: 1rem; }
         .sidebar .nav-link[data-bs-toggle="collapse"]::after { content: '\25BC'; float: right; font-size: 0.7rem; margin-top: 0.3rem; transition: transform 0.2s ease-in-out; }
         .sidebar .nav-link[data-bs-toggle="collapse"][aria-expanded="false"]::after { transform: rotate(-90deg); }
-        @media (max-width: 767.98px) { .sidebar { width: 100%; min-height: auto; } }
+        @media (max-width: 767.98px) { .sidebar { width: 100%; min-width: 100%; min-height: auto; } }
+
+        /* Variable Selector Styles */
+        .var-selector { position: relative; }
+        .var-selector-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            z-index: 1050;
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            background: #fff;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            display: none;
+        }
+        .var-selector-dropdown.show { display: block; }
+        .var-group-header {
+            padding: 6px 12px;
+            font-weight: 700;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            background: #f0f4f8;
+            color: #495057;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .var-item {
+            padding: 6px 12px 6px 12px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.1s;
+        }
+        .var-item:hover { background: #e7f1ff; }
+        .var-item.selected { background: #d1e7ff; }
+        .custom-check {
+            width: 18px;
+            height: 18px;
+            min-width: 18px;
+            border: 2px solid #adb5bd;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+            background: #fff;
+        }
+        .custom-check.checked {
+            background: #0d6efd;
+            border-color: #0d6efd;
+        }
+        .custom-check .check-icon {
+            color: #fff;
+            font-size: 12px;
+            line-height: 1;
+            opacity: 0;
+            transform: scale(0.5);
+            transition: all 0.15s ease;
+        }
+        .custom-check.checked .check-icon {
+            opacity: 1;
+            transform: scale(1);
+        }
+        .var-item code {
+            font-size: 0.8rem;
+            color: #0d6efd;
+            background: #e9ecef;
+            padding: 1px 5px;
+            border-radius: 3px;
+        }
+        .var-search-input { border-radius: 6px 6px 0 0; }
+        .var-search-input:focus { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+        .var-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            font-size: 0.75rem;
+            border-radius: 4px;
+            background: #e7f1ff;
+            color: #0d6efd;
+            border: 1px solid #b6d4fe;
+            margin: 2px;
+        }
+        .var-badge .remove-var {
+            cursor: pointer;
+            font-size: 0.7rem;
+            color: #6c757d;
+            transition: color 0.15s;
+        }
+        .var-badge .remove-var:hover { color: #dc3545; }
+        .var-selected-area {
+            min-height: 38px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 6px 8px;
+            background: #f8f9fa;
+            cursor: text;
+        }
+        .var-empty-msg { color: #adb5bd; font-size: 0.85rem; }
+        .var-count-badge {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 10px;
+            background: #0d6efd;
+            color: #fff;
+        }
     </style>
 </head>
 <body class="bg-light">
@@ -58,20 +178,80 @@
                                 </template>
                             </select>
                         </div>
+                        <div class="col-md-2">
+                            <label class="form-label">File Format</label>
+                            <select class="form-select" x-model="form.file_format" required>
+                                <option value="md">Markdown (.md)</option>
+                                <option value="docx">Word (.docx)</option>
+                            </select>
+                        </div>
                     </div>
 
+                    <!-- Variable Selector -->
                     <div class="row g-3 mb-3">
                         <div class="col-12">
-                            <label class="form-label">Variables (Comma-separated)</label>
-                            <input type="text" class="form-control" x-model="variablesInput" placeholder="e.g., project.name, customer.email, deal_winner">
-                            <div class="form-text">Type variables separated by commas. They will be saved as a JSON array.</div>
+                            <label class="form-label">
+                                Variables 
+                                <span class="var-count-badge" x-show="form.variables.length > 0" x-text="form.variables.length"></span>
+                            </label>
+                            
+                            <div class="var-selected-area mb-2" @click="openVarDropdown()">
+                                <template x-for="varName in form.variables" :key="varName">
+                                    <span class="var-badge">
+                                        <code x-text="varName"></code>
+                                        <i class="bi bi-x remove-var" @click.stop="removeVariable(varName)"></i>
+                                    </span>
+                                </template>
+                                <span x-show="form.variables.length === 0" class="var-empty-msg">Click to select project variables...</span>
+                            </div>
+
+                            <div class="var-selector" @click.outside="closeVarDropdown()">
+                                <input 
+                                    type="text" 
+                                    class="form-control var-search-input" 
+                                    x-model="varSearch" 
+                                    placeholder="Search variables..." 
+                                    @focus="openVarDropdown()" 
+                                    @input="openVarDropdown()"
+                                    autocomplete="off">
+                                
+                                <div class="var-selector-dropdown" :class="varDropdownOpen ? 'show' : ''">
+                                    <template x-for="group in filteredVarGroups" :key="group.label">
+                                        <div>
+                                            <div class="var-group-header" x-show="group.items.length > 0" x-text="group.label"></div>
+                                            <template x-for="item in group.items" :key="item.key">
+                                                <div 
+                                                    class="var-item" 
+                                                    :class="isVariableSelected(item.key) ? 'selected' : ''"
+                                                    @click="toggleVariable(item.key)">
+                                                    <span class="custom-check" :class="isVariableSelected(item.key) ? 'checked' : ''">
+                                                        <i class="bi bi-check-lg check-icon"></i>
+                                                    </span>
+                                                    <span x-text="item.label"></span>
+                                                    <code x-text="item.key"></code>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+                                    <div x-show="filteredVarGroups.every(g => g.items.length === 0)" class="text-center text-muted py-3 small">
+                                        No variables match your search
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-text">Select project fields to use as template variables. Use <code>&#123;&#123;name&#125;&#125;</code> syntax in your markdown content.</div>
                         </div>
                     </div>
 
                     <div class="row g-3 mb-3">
                         <div class="col-12">
                             <label class="form-label">Markdown Content</label>
-                            <textarea class="form-control font-monospace" x-model="form.markdown_content" rows="8" required placeholder="# SOW for {project.name}..."></textarea>
+                            <textarea 
+                                class="form-control font-monospace" 
+                                x-model="form.markdown_content" 
+                                rows="10" 
+                                required 
+                                placeholder="# SOW for &#123;&#123;name&#125;&#125;&#10;&#10;Customer: &#123;&#123;customer_name&#125;&#125;&#10;Start Date: &#123;&#123;start_date&#125;&#125;&#10;Go-Live: &#123;&#123;go_live_date&#125;&#125;"></textarea>
                         </div>
                     </div>
 
@@ -83,6 +263,8 @@
                             </div>
                         </div>
                     </div>
+
+
 
                     <div class="mt-2">
                         <button type="submit" class="btn" :class="isEditing ? 'btn-warning' : 'btn-primary'" x-text="isEditing ? 'Update Template' : 'Create Template'"></button>
@@ -102,6 +284,7 @@
                             <tr>
                                 <th>Name</th>
                                 <th>Type</th>
+                                <th>Variables</th>
                                 <th>Version</th>
                                 <th>Created By</th>
                                 <th>Active</th>
@@ -109,13 +292,19 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr x-show="loading"><td colspan="6" class="text-center text-muted py-4">Loading...</td></tr>
-                            <tr x-show="!loading && templates.length === 0"><td colspan="6" class="text-center text-muted py-4">No templates found.</td></tr>
+                            <tr x-show="loading"><td colspan="7" class="text-center text-muted py-4">Loading...</td></tr>
+                            <tr x-show="!loading && templates.length === 0"><td colspan="7" class="text-center text-muted py-4">No templates found.</td></tr>
                             <template x-for="tmpl in templates" :key="tmpl.id">
                                 <tr>
                                     <td class="fw-semibold" x-text="tmpl.name"></td>
                                     <td>
                                         <span class="badge text-capitalize" :class="getTypeBadgeColor(tmpl.type)" x-text="tmpl.type.replace('_', ' ')"></span>
+                                    </td>
+                                    <td>
+                                        <template x-for="v in (tmpl.variables || []).slice(0, 3)" :key="v">
+                                            <code class="me-1" style="font-size:0.7rem" x-text="v"></code>
+                                        </template>
+                                        <span x-show="(tmpl.variables || []).length > 3" class="badge bg-secondary" x-text="'+' + ((tmpl.variables || []).length - 3)"></span>
                                     </td>
                                     <td x-text="'v' + tmpl.version"></td>
                                     <td x-text="getUserName(tmpl.created_by_id)"></td>
@@ -142,12 +331,209 @@
     function documentTemplateManager() {
         return {
             templates: [], users: [], loading: true, isEditing: false,
-            form: { id: '', name: '', type: 'sow', markdown_content: '', version: 1, is_active: true, created_by_id: '' },
-            variablesInput: '', // Helper for UI comma-separated string
+            form: { id: '', name: '', type: 'sow', markdown_content: '', variables: [], version: 1, is_active: true, file_format: 'md',  created_by_id: '' },
+            varSearch: '',
+            varDropdownOpen: false,
             error: '',
 
             apiBase: "/document-template",
             userApi: "/user",
+
+            projectVariableGroups: [
+                {
+                    label: '📋 Core Info',
+                    items: [
+                        { key: 'name', label: 'Project Name' },
+                        { key: 'type', label: 'Project Type' },
+                        { key: 'start_date', label: 'Start Date' },
+                        { key: 'customer_id', label: 'Customer ID' },
+                        { key: 'deal_winner_id', label: 'Deal Winner ID' },
+                        { key: 'default_duration_weeks', label: 'Duration (Weeks)' },
+                        { key: 'requires_integration', label: 'Requires Integration' },
+                        { key: 'integration_type', label: 'Integration Type' },
+                        { key: 'partner_budget_hours', label: 'Partner Budget (Hours)' },
+                        { key: 'internal_budget_hours', label: 'Internal Budget (Hours)' },
+                        { key: 'status', label: 'Project Status' },
+                        { key: 'primary_usecase_id', label: 'Primary Usecase ID' },
+                    ]
+                },
+                {
+                    label: '🎯 Project Details & Objectives',
+                    items: [
+                        { key: 'go_live_date', label: 'Go-Live Date' },
+                        { key: 'go_live_regions', label: 'Go-Live Regions' },
+                        { key: 'rollout_regions', label: 'Rollout Regions' },
+                        { key: 'project_background', label: 'Project Background' },
+                        { key: 'main_objectives', label: 'Main Objectives' },
+                        { key: 'top_three_pain_points', label: 'Top Three Pain Points' },
+                        { key: 'language_constraints', label: 'Language Constraints' },
+                        { key: 'project_risks', label: 'Project Risks' },
+                        { key: 'overall_accuracy_target', label: 'Overall Accuracy Target' },
+                    ]
+                },
+                {
+                    label: '✅ Success Criteria & Document Types',
+                    items: [
+                        { key: 'success_criteria', label: 'Success Criteria' },
+                        { key: 'success_criteria_custom', label: 'Custom Success Criteria' },
+                        { key: 'document_types', label: 'Document Types & Accuracy' },
+                    ]
+                },
+                {
+                    label: '📊 Volume & Performance Metrics',
+                    items: [
+                        { key: 'annual_doc_volume_per_usecase', label: 'Annual Document Volume' },
+                        { key: 'e2e_cost_per_doc', label: 'E2E Cost Per Document' },
+                        { key: 'e2e_processing_time_mins', label: 'E2E Processing Time (mins)' },
+                        { key: 'automation_improvement_percentage', label: 'Automation Improvement %' },
+                        { key: 'approx_supplier_customer_count', label: 'Supplier/Customer Count' },
+                    ]
+                },
+                {
+                    label: '🔌 Technical Integration',
+                    items: [
+                        { key: 'target_erp', label: 'Target ERP' },
+                        { key: 'sap_addon_concerns', label: 'SAP Addon Concerns' },
+                        { key: 'current_workflow', label: 'Current Workflow' },
+                        { key: 'existing_services', label: 'Existing Services' },
+                        { key: 'document_receipt_channels', label: 'Document Receipt Channels' },
+                        { key: 'data_points_current', label: 'Data Points Current' },
+                        { key: 'number_erp_systems', label: 'Number of ERP Systems' },
+                    ]
+                },
+                {
+                    label: '📄 Document Processing Discovery',
+                    items: [
+                        { key: 'users_work_in_studio', label: 'Users Work in Studio?' },
+                        { key: 'supplier_guidelines', label: 'Supplier Guidelines' },
+                        { key: 'other_processing_guidelines', label: 'Other Processing Guidelines' },
+                        { key: 'multi_invoice_documents', label: 'Multi Invoice Documents' },
+                        { key: 'multi_invoice_share', label: 'Multi Invoice Share %' },
+                        { key: 'file_formats_received', label: 'File Formats Received' },
+                        { key: 'poor_quality_scans', label: 'Poor Quality Scans' },
+                        { key: 'document_submission_channels', label: 'Document Submission Channels' },
+                        { key: 'expected_doc_types_in_channels', label: 'Expected Doc Types in Channels' },
+                        { key: 'out_of_scope_handling', label: 'Out of Scope Handling' },
+                    ]
+                },
+                {
+                    label: '📧 Email Processing',
+                    items: [
+                        { key: 'email_content_downstream', label: 'Email Content Downstream' },
+                        { key: 'eml_archiving', label: 'EML Archiving' },
+                        { key: 'inbound_email_rules', label: 'Inbound Email Rules' },
+                        { key: 'email_routing', label: 'Email Routing' },
+                    ]
+                },
+                {
+                    label: '🏷️ Classification & Matching',
+                    items: [
+                        { key: 'document_classification_method', label: 'Document Classification Method' },
+                        { key: 'statements_classification', label: 'Statements Classification' },
+                        { key: 'statements_downstream', label: 'Statements Downstream' },
+                        { key: 'leases_recurring_handling', label: 'Leases Recurring Handling' },
+                        { key: 'po_nonpo_identification', label: 'PO / Non-PO Identification' },
+                        { key: 'po_nonpo_distribution', label: 'PO / Non-PO Distribution' },
+                        { key: 'rejection_classification', label: 'Rejection Classification' },
+                        { key: 'rejection_timing', label: 'Rejection Timing' },
+                        { key: 'rejection_communication', label: 'Rejection Communication' },
+                        { key: 'standardized_rejection_messages', label: 'Standardized Rejection Messages' },
+                        { key: 'bounced_rejections_handling', label: 'Bounced Rejections Handling' },
+                    ]
+                },
+                {
+                    label: '🗃️ Master Data & Verification',
+                    items: [
+                        { key: 'verification_team_structure', label: 'Verification Team Structure' },
+                        { key: 'routing_criteria', label: 'Routing Criteria' },
+                        { key: 'master_data_assignment', label: 'Master Data Assignment' },
+                        { key: 'missing_master_data_handling', label: 'Missing Master Data Handling' },
+                        { key: 'duplicate_master_data', label: 'Duplicate Master Data' },
+                    ]
+                },
+                {
+                    label: '🔗 PO Matching & Processing',
+                    items: [
+                        { key: 'delivery_note_extraction', label: 'Delivery Note Extraction' },
+                        { key: 'po_types_common', label: 'PO Types Common' },
+                        { key: 'po_vs_invoice_values', label: 'PO vs Invoice Values' },
+                        { key: 'po_deviation_handling', label: 'PO Deviation Handling' },
+                        { key: 'missing_po_number', label: 'Missing PO Number' },
+                        { key: 'non_matched_po_processing', label: 'Non-Matched PO Processing' },
+                    ]
+                },
+                {
+                    label: '💰 Accounting Coding & GL',
+                    items: [
+                        { key: 'custom_gl_logic', label: 'Custom GL Logic' },
+                        { key: 'mandatory_posting_attributes', label: 'Mandatory Posting Attributes' },
+                        { key: 'accounting_templates_usage', label: 'Accounting Templates Usage' },
+                        { key: 'gl_costcenter_assignment', label: 'GL/Cost Center Assignment' },
+                        { key: 'reviewer_approver_derivation', label: 'Reviewer/Approver Derivation' },
+                    ]
+                },
+                {
+                    label: '📈 KPIs & Success Measurement',
+                    items: [
+                        { key: 'current_kpis', label: 'Current KPIs' },
+                        { key: 'verification_team_kpis', label: 'Verification Team KPIs' },
+                        { key: 'special_document_handling', label: 'Special Document Handling' },
+                    ]
+                },
+            ],
+
+            get filteredVarGroups() {
+                const search = this.varSearch.toLowerCase().trim();
+                if (!search) return this.projectVariableGroups;
+                
+                return this.projectVariableGroups.map(group => ({
+                    ...group,
+                    items: group.items.filter(item => 
+                        item.key.toLowerCase().includes(search) || 
+                        item.label.toLowerCase().includes(search)
+                    )
+                }));
+            },
+
+            isVariableSelected(key) {
+                return this.form.variables.includes(key);
+            },
+
+            openVarDropdown() {
+                this.varDropdownOpen = true;
+            },
+
+            closeVarDropdown() {
+                this.varDropdownOpen = false;
+            },
+
+            toggleVariable(key) {
+                if (this.form.variables.includes(key)) {
+                    this.form.variables = this.form.variables.filter(v => v !== key);
+                } else {
+                    this.form.variables = [...this.form.variables, key];
+                }
+            },
+
+            removeVariable(key) {
+                this.form.variables = this.form.variables.filter(v => v !== key);
+            },
+
+            selectAllVisible() {
+                const keysToAdd = [];
+                this.filteredVarGroups.forEach(group => {
+                    group.items.forEach(item => {
+                        if (!this.form.variables.includes(item.key)) {
+                            keysToAdd.push(item.key);
+                        }
+                    });
+                });
+                this.form.variables = [...this.form.variables, ...keysToAdd];
+            },
+
+            clearAllVariables() {
+                this.form.variables = [];
+            },
 
             async initData() {
                 await this.fetchUsers();
@@ -171,21 +557,12 @@
                 } catch (e) { console.error("Error fetching users"); }
             },
 
-            parseVariables() {
-                // Guarantees an empty array [] is returned if input is blank, 
-                // which matches our list[str] schema requirement perfectly.
-                if (!this.variablesInput || this.variablesInput.trim() === "") return [];
-                return this.variablesInput.split(",").map(v => v.trim()).filter(v => v !== "");
-            },
-
             async submitForm() {
                 let payload = JSON.parse(JSON.stringify(this.form));
-                payload.variables = this.parseVariables(); // Inject the parsed array
 
                 try {
                     if (this.isEditing) {
                         const id = payload.id;
-                        // Clean up empty strings for PATCH exclude_none
                         Object.keys(payload).forEach((k) => { 
                             if (payload[k] === "" || payload[k] === null) delete payload[k]; 
                         });
@@ -216,9 +593,10 @@
 
             editTemplate(tmpl) {
                 this.isEditing = true;
-                this.form = JSON.parse(JSON.stringify(tmpl));
-                // Convert JSON array back to comma-separated string for the UI input
-                this.variablesInput = Array.isArray(tmpl.variables) ? tmpl.variables.join(", ") : "";
+                let editData = JSON.parse(JSON.stringify(tmpl));
+                editData.variables = Array.isArray(editData.variables) ? [...editData.variables] : [];
+                this.form = editData;
+                this.varSearch = '';
             },
 
             async deleteTemplate(tmpl) {
@@ -231,8 +609,9 @@
 
             resetForm() {
                 this.isEditing = false;
-                this.form = { id: '', name: '', type: 'sow', markdown_content: '', version: 1, is_active: true, created_by_id: '' };
-                this.variablesInput = '';
+                this.form = { id: '', name: '', type: 'sow', markdown_content: '', variables: [], version: 1, is_active: true, file_format: 'md', created_by_id: '' };
+                this.varSearch = '';
+                this.varDropdownOpen = false;
             },
 
             getUserName(id) {
