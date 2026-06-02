@@ -321,7 +321,8 @@
                                 </label>
                                 
                                 <div style="max-height: 300px; overflow-y: auto;" class="mb-3">
-                                    <template x-for="tmpl in docTemplates" :key="tmpl.id">
+                                    
+                                    <template x-for="tmpl in activeDocTemplates" :key="tmpl.id">
                                         <div 
                                             class="template-item" 
                                             :class="isTemplateSelected(tmpl.id) ? 'selected' : ''"
@@ -480,6 +481,10 @@
             userApi: "/user",
             usecaseApi: "/usecase",
             templateApi: "/document-template",
+
+            get activeDocTemplates() {
+                return this.docTemplates.filter(t => t.is_active === true);
+            },
 
             // ========== TEMPLATE SELECTION (CUSTOM CHECKBOX) ==========
             isTemplateSelected(id) {

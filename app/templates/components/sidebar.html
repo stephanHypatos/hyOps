@@ -36,6 +36,10 @@
             <!-- Submenu: Automatically opens if a child is the current_page -->
             <ul class="collapse {% if current_page in ['organizations', 'users', 'subtypes', 'capabilities','features','languages','skills','document_templates','usecases'] %}show{% endif %} nav flex-column submenu" id="mainDataMenu">
                 <li class="nav-item">
+                    <a class="nav-link {% if current_page == 'languages' %}active{% endif %}" href="/languages-page">🌐 Languages</a>
+                </li>
+                
+                <li class="nav-item">
                     <a class="nav-link {% if current_page == 'organizations' %}active{% endif %}" href="/">🏢 Organizations</a>
                 </li>
                  <li class="nav-item">
@@ -60,9 +64,7 @@
                 </li>
 
 
-                <li class="nav-item">
-                    <a class="nav-link {% if current_page == 'languages' %}active{% endif %}" href="/languages-page">🌐 Languages</a>
-                </li>
+                
                 <li class="nav-item">
                     <a class="nav-link {% if current_page == 'skills' %}active{% endif %}" href="/skills-page">🛠️ Skills</a>
                 </li>

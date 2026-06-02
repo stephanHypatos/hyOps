@@ -1,13 +1,12 @@
 
 import os
 import re
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from uuid import UUID
-from typing import Optional
 from datetime import datetime
 from sqlmodel import select
-
+from enum import Enum
 from app.database.models import (
     Project, ProjectStakeholder, ProjectUsecase, 
     User, Usecase,DocumentTemplate
@@ -16,7 +15,7 @@ from app.database.session import SessionDep
 from app.api.schemas.project import (
     ProjectCreate, ProjectRead, ProjectUpdate,
     StakeholderRead, StakeholderReadEnriched, StakeholderAssign,
-    UsecaseAssign, UsecaseRead, GeneratedDocumentReadEnriched, GenerateFromTemplatesRequest
+    UsecaseAssign, UsecaseRead, GenerateFromTemplatesRequest
 )
 
 from app.config import basedir
@@ -190,6 +189,14 @@ async def remove_usecase(project_id: UUID, usecase_id: UUID, session: SessionDep
 
 # ===================== Helper Functions =====================
 
+FEATURE_SKIP = {
+    "id", "capability_id", "owner_id", "created_at", "updated_at", 
+    "multiple_value", "scoping_questionnaire", "reference_documentation", 
+    "included_in_ootb", "default_enabled", "active", "capability", "owner", 
+    "scope_specifications", "cost_drivers", "feature_efforts", "usecases", "requirements"
+}
+
+
 PROJECT_SKIP = {
     "id", "created_at", "updated_at",
     "customer", "deal_winner", "stakeholders",
@@ -211,9 +218,13 @@ USER_SKIP = {
 USECASE_SKIP = {"id", "features", "projects"}
 
 
+
 def _serialize_value(val):
     if val is None:
         return ""
+    # FIX: Check for Enum first and return its actual value (e.g., "pilot" instead of "ProjectType.pilot")
+    if isinstance(val, Enum):
+        return val.value
     if hasattr(val, 'isoformat'):
         return val.isoformat()
     if isinstance(val, bool):
@@ -227,7 +238,6 @@ def _serialize_value(val):
     return str(val)
 
 
-
 def _extract_fields(obj, skip_set):
     result = {}
     # Works with both Pydantic v1 and v2
@@ -239,6 +249,7 @@ def _extract_fields(obj, skip_set):
     return result
 
 
+
 def build_render_context(project: Project) -> dict:
     """Build nested dict from Project ORM for {{project.name}} style placeholders."""
     context = {
@@ -247,6 +258,7 @@ def build_render_context(project: Project) -> dict:
         "deal_winner": _extract_fields(project.deal_winner, USER_SKIP) if project.deal_winner else {},
         "primary_usecase": _extract_fields(project.primary_usecase, USECASE_SKIP) if project.primary_usecase else {},
         "stakeholders": [],
+        "features": [], # NEW: Add features list for iteration
     }
 
     if project.stakeholders:
@@ -260,20 +272,79 @@ def build_render_context(project: Project) -> dict:
                 "subtype": str(getattr(user.subtype, 'name', '')) if hasattr(user, 'subtype') and user.subtype else '',
             })
 
+    # NEW: Extract features from primary usecase
+    if project.primary_usecase and project.primary_usecase.features:
+        for feature in project.primary_usecase.features:
+            context["features"].append(_extract_fields(feature, FEATURE_SKIP))
+
     return context
 
 
+
+
 def replace_placeholders(markdown_content: str, context: dict) -> str:
-    """Pure regex replacement for {{project.name}}, {{customer.email}}, etc."""
+    """Pure regex replacement for {{project.name}}, {{customer.email}}, and #loops."""
+    
+    # 1. Handle list loops first: {{#features}} ... {{feature.name}} ... {{/features}}
+    loop_pattern = r'\{\{#(\w+)\}\}(.*?)\{\{/\1\}\}'
+    
+    def loop_replacer(match):
+        list_key = match.group(1)
+        inner_template = match.group(2).strip()
+        items = _resolve_dot_path(list_key, context)
+        
+        if not isinstance(items, list):
+            return ""
+        
+        rendered_items = []
+        for item in items:
+            if isinstance(item, dict):
+                item_rendered = inner_template
+                # Replace nested variables like {{feature.name}} or bare {{name}}
+                for k, v in item.items():
+                    val = str(v) if v is not None else ""
+                    # Handle singular key (e.g. features -> feature)
+                    singular_key = list_key[:-1] if list_key.endswith('s') else list_key
+                    item_rendered = item_rendered.replace(f'{{{{{singular_key}.{k}}}}}', val)
+                    # Handle bare key
+                    item_rendered = item_rendered.replace(f'{{{{{k}}}}}', val)
+                rendered_items.append(item_rendered)
+        return "\n".join(rendered_items)
+
+    markdown_content = re.sub(loop_pattern, loop_replacer, markdown_content, flags=re.DOTALL)
+
+    # 2. Handle simple variables (existing logic + singular list fallback)
     def replacer(match):
         var_path = match.group(1).strip()
         value = _resolve_dot_path(var_path, context)
+        
         if value is None:
             # Fallback: bare key like {{name}} → try under "project"
             if "." not in var_path:
                 value = _resolve_dot_path(f"project.{var_path}", context)
+                
+        # NEW: Handle singular.key outside of loops (e.g., {{feature.name}} -> joins all feature names)
+        if value is None and "." in var_path:
+            parts = var_path.split(".", 1)
+            singular = parts[0]      # e.g., "feature"
+            nested_key = parts[1]    # e.g., "name"
+            
+            # Try to find the plural list in context (e.g., "feature" -> "features")
+            plural = singular + "s" if not singular.endswith("s") else singular
+            list_items = _resolve_dot_path(plural, context)
+            
+            if isinstance(list_items, list):
+                extracted = []
+                for item in list_items:
+                    if isinstance(item, dict) and nested_key in item:
+                        if item[nested_key] is not None:
+                            extracted.append(str(item[nested_key]))
+                if extracted:
+                    value = ", ".join(extracted)
+                    
         if value is None:
             return match.group(0)
+            
         if isinstance(value, list):
             if len(value) > 0 and isinstance(value[0], dict):
                 lines = []
@@ -319,24 +390,6 @@ def save_generated_file(output_dir: str, filename: str, content: str, file_forma
 
 
 
-def save_generated_file(output_dir: str, filename: str, content: str, file_format: str) -> str:
-    """Save rendered content to disk as .md or .docx"""
-    os.makedirs(output_dir, exist_ok=True)
-    file_path = os.path.join(output_dir, filename)
-
-    if file_format == "docx":
-        from docx import Document
-        doc = Document()
-        for line in content.split('\n'):
-            doc.add_paragraph(line)
-        doc.save(file_path)
-    else:
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(content)
-
-    return file_path
-
-
 # ===================== Template-Based Generation Endpoints =====================
 
 @router.get("/{project_id}/generated-documents")
@@ -371,6 +424,8 @@ async def get_generated_documents(project_id: UUID, session: SessionDep):
     return results
 
 
+
+
 @router.post("/{project_id}/generate-from-templates")
 async def generate_from_templates(
     project_id: UUID,
@@ -391,7 +446,9 @@ async def generate_from_templates(
 
     for template_id in data.template_ids:
         template = await session.get(DocumentTemplate, template_id)
-        if not template:
+        
+        # VALIDATION: Skip if template doesn't exist OR is not active
+        if not template or not template.is_active:
             continue
 
         # 1. Replace placeholders
@@ -412,6 +469,10 @@ async def generate_from_templates(
             "status": "final",
             "created_at": datetime.now().isoformat(),
         })
+
+    # Optional: Handle case where all requested templates were inactive/not found
+    if not results and data.template_ids:
+        raise HTTPException(status_code=400, detail="All selected templates are either inactive or do not exist.")
 
     return {
         "detail": f"Generated {len(results)} document(s) successfully",

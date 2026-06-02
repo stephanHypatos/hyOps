@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, EmailStr
 from app.database.models import OrganizationType
 from datetime import datetime
 from uuid import UUID

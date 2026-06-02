@@ -165,9 +165,11 @@
                                 <option value="other">Other</option>
                             </select>
                         </div>
+                        
                         <div class="col-md-2">
                             <label class="form-label">Version</label>
-                            <input type="number" class="form-control" x-model="form.version" required min="1">
+                            <!-- Add step="0.1" and change min to 0.1 -->
+                            <input type="decimal" step="0.1" class="form-control" x-model="form.version" required min="0.1">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Created By (User)</label>
@@ -306,7 +308,8 @@
                                         </template>
                                         <span x-show="(tmpl.variables || []).length > 3" class="badge bg-secondary" x-text="'+' + ((tmpl.variables || []).length - 3)"></span>
                                     </td>
-                                    <td x-text="'v' + tmpl.version"></td>
+                                    
+                                    <td x-text="'v' + tmpl.version.toFixed(1)"></td>
                                     <td x-text="getUserName(tmpl.created_by_id)"></td>
                                     <td>
                                         <span class="badge" :class="tmpl.is_active ? 'bg-success' : 'bg-secondary'" x-text="tmpl.is_active ? 'Active' : 'Inactive'"></span>
@@ -331,7 +334,7 @@
     function documentTemplateManager() {
         return {
             templates: [], users: [], loading: true, isEditing: false,
-            form: { id: '', name: '', type: 'sow', markdown_content: '', variables: [], version: 1, is_active: true, file_format: 'md',  created_by_id: '' },
+            form: { id: '', name: '', type: 'sow', markdown_content: '', variables: [], version: 1.0, is_active: true, file_format: 'md',  created_by_id: '' },
             varSearch: '',
             varDropdownOpen: false,
             error: '',
@@ -346,15 +349,47 @@
                         { key: 'name', label: 'Project Name' },
                         { key: 'type', label: 'Project Type' },
                         { key: 'start_date', label: 'Start Date' },
-                        { key: 'customer_id', label: 'Customer ID' },
-                        { key: 'deal_winner_id', label: 'Deal Winner ID' },
                         { key: 'default_duration_weeks', label: 'Duration (Weeks)' },
                         { key: 'requires_integration', label: 'Requires Integration' },
                         { key: 'integration_type', label: 'Integration Type' },
                         { key: 'partner_budget_hours', label: 'Partner Budget (Hours)' },
                         { key: 'internal_budget_hours', label: 'Internal Budget (Hours)' },
                         { key: 'status', label: 'Project Status' },
-                        { key: 'primary_usecase_id', label: 'Primary Usecase ID' },
+                    ]
+                },
+                {
+                    label: '🏢 Customer (Organization)',
+                    items: [
+                        { key: 'customer.name', label: 'Customer Name' },
+                        { key: 'customer.industry', label: 'Industry' },
+                        { key: 'customer.country', label: 'Country' },
+                        { key: 'customer.email', label: 'Customer Email' },
+                        { key: 'customer.company_overview', label: 'Company Overview' },
+                    ]
+                },
+                {
+                    label: '👤 Deal Winner (User)',
+                    items: [
+                        { key: 'deal_winner.first_name', label: 'Winner First Name' },
+                        { key: 'deal_winner.last_name', label: 'Winner Last Name' },
+                        { key: 'deal_winner.email', label: 'Winner Email' },
+                    ]
+                },
+                {
+                    label: '🎯 Primary Usecase',
+                    items: [
+                        { key: 'primary_usecase.name', label: 'Usecase Name' },
+                        { key: 'primary_usecase.description', label: 'Usecase Description' },
+                    ]
+                },
+                {
+                    label: '⚙️ Primary Usecase Features (Use in Loop)',
+                    items: [
+                        { key: 'feature.name', label: 'Feature Name' },
+                        { key: 'feature.service_description', label: 'Service Description' },
+                        { key: 'feature.requirement_description', label: 'Requirement Description' },
+                        { key: 'feature.solution_description', label: 'Solution Description' },
+                        { key: 'feature.scope_type', label: 'Scope Type' },
                     ]
                 },
                 {
@@ -609,7 +644,7 @@
 
             resetForm() {
                 this.isEditing = false;
-                this.form = { id: '', name: '', type: 'sow', markdown_content: '', variables: [], version: 1, is_active: true, file_format: 'md', created_by_id: '' };
+                this.form = { id: '', name: '', type: 'sow', markdown_content: '', variables: [], version: 1.0, is_active: true, file_format: 'md', created_by_id: '' };
                 this.varSearch = '';
                 this.varDropdownOpen = false;
             },

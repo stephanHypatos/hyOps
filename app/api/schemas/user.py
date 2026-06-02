@@ -1,6 +1,5 @@
 from typing import Optional
 from pydantic import EmailStr, BaseModel
-from sqlmodel import SQLModel, select
 from uuid import UUID
 from app.database.models import UserType, UserRole
 from datetime import datetime

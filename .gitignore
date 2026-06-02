@@ -172,3 +172,4 @@ pyrightconfig.json
 dataset
 app_cli.py
 /.vscode
+app/logs/app.log

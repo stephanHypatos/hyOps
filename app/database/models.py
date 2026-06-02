@@ -369,168 +369,6 @@ class User(SQLModel, table=True):
     )
 
 
-# class Project(SQLModel, table=True):
-#     __tablename__ = "project"
-
-#     id: UUID = Field(
-#         sa_column=Column(postgresql.UUID, default=uuid4, primary_key=True)
-#     )
-#     name: str
-#     type: ProjectType
-#     start_date: date
-#     customer_id: UUID = Field(foreign_key="organization.id")
-#     deal_winner_id: UUID = Field(foreign_key="user.id")
-#     default_duration_weeks: int
-#     requires_integration: bool
-#     integration_type: IntegrationType
-#     partner_budget_hours: Decimal = Field(sa_column=Column(Numeric))
-#     internal_budget_hours: Decimal = Field(sa_column=Column(Numeric))
-    
-#     # --- NEW FIELDS ---
-#     status: ProjectStatus = ProjectStatus.draft
-#     primary_usecase_id: Optional[UUID] = Field(default=None, foreign_key="usecase.id")
-
-#     # Technical Integration
-#     target_erp: Optional[str] = None
-#     sap_addon_concerns: Optional[str] = None
-#     current_workflow: Optional[str] = None
-#     existing_services: Optional[str] = None
-#     document_receipt_channels: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list) # Multiselect
-#     data_points_current: Optional[str] = None
-#     current_process_overview: Optional[str] = None
-#     number_erp_systems: Optional[int] = None
-
-#     # Document Processing Discovery
-#     users_work_in_studio: Optional[str] = None
-#     supplier_guidelines: Optional[str] = None
-#     other_processing_guidelines: Optional[str] = None
-#     multi_invoice_documents: Optional[str] = None
-#     multi_invoice_share: Optional[int] = None
-#     file_formats_received: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list) # Multiselect
-#     poor_quality_scans: Optional[str] = None
-#     document_submission_channels: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list) # Multiselect
-#     expected_doc_types_in_channels: Optional[str] = None
-#     out_of_scope_handling: Optional[str] = None
-#     scanning_method: Optional[str] = None
-#     barcoding_separation: Optional[str] = None
-#     classify_during_scan: Optional[str] = None
-
-#     # Email Processing
-#     email_content_downstream: Optional[str] = None
-#     eml_archiving: Optional[str] = None
-#     inbound_email_rules: Optional[str] = None
-#     email_routing: Optional[str] = None
-
-#     # Classification & Matching
-#     document_classification_method: Optional[str] = None
-#     statements_classification: Optional[str] = None
-#     statements_downstream: Optional[str] = None
-#     leases_recurring_handling: Optional[str] = None
-#     po_nonpo_identification: Optional[str] = None
-#     po_nonpo_distribution: Optional[str] = None
-#     rejection_classification: Optional[str] = None
-#     rejection_timing: Optional[str] = None
-#     rejection_communication: Optional[str] = None
-#     standardized_rejection_messages: Optional[str] = None
-#     bounced_rejections_handling: Optional[str] = None
-
-#     # Master Data & Verification
-#     verification_team_structure: Optional[str] = None
-#     routing_criteria: Optional[str] = None
-#     master_data_assignment: Optional[str] = None
-#     missing_master_data_handling: Optional[str] = None
-#     duplicate_master_data: Optional[str] = None
-
-#     # PO Matching & Processing
-#     delivery_note_extraction: Optional[str] = None
-#     po_types_common: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list) # Multiselect
-#     po_vs_invoice_values: Optional[str] = None
-#     po_deviation_handling: Optional[str] = None
-#     missing_po_number: Optional[str] = None
-#     non_matched_po_processing: Optional[str] = None
-
-#     # Accounting Coding & GL
-#     custom_gl_logic: Optional[str] = None
-#     mandatory_posting_attributes: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list) # Multiselect
-#     accounting_templates_usage: Optional[str] = None
-#     gl_costcenter_assignment: Optional[str] = None
-#     reviewer_approver_derivation: Optional[str] = None
-    
-    
-#     # 📊 Volume & Performance Metrics
-#     annual_doc_volume_per_usecase: Optional[int] = Field(default=0)
-#     e2e_cost_per_doc: Optional[Decimal] = Field(default=0, sa_column=Column(Numeric))
-#     e2e_processing_time_mins: Optional[int] = Field(default=0)
-#     automation_improvement_percentage: Optional[int] = Field(default=0)
-#     approx_supplier_customer_count: Optional[int] = Field(default=0)
-
-#     # KPIs & Success Measurement
-#     current_kpis: Optional[str] = None
-#     verification_team_kpis: Optional[str] = None
-#     special_document_handling: Optional[str] = None
-
-#     # --- NEW: Generated Document Paths ---
-#     sow_markdown_path: Optional[str] = None
-#     sow_docx_path: Optional[str] = None
-#     success_contract_path: Optional[str] = None
-#     solution_design_path: Optional[str] = None
-    
-    
-#     # 🆕 REQUIRED FOR DOCUMENT GENERATION:
-#     go_live_date: Optional[date] = None
-#     go_live_regions: Optional[str] = None
-#     rollout_regions: Optional[str] = None
-#     project_background: Optional[str] = None
-#     main_objectives: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list)
-#     top_three_pain_points: Optional[str] = None
-#     language_constraints: Optional[str] = None
-#     project_risks: Optional[str] = None
-#     overall_accuracy_target: Optional[int] = None
-#     success_criteria: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list)
-#     success_criteria_custom: Optional[str] = None
-#     document_types: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list)
-#     # Structure: [{"document_name": "Invoice", "accuracy_target": 95}]
-    
-
-#     # Timestamps
-#     created_at: datetime = Field(default_factory=datetime.utcnow)
-#     updated_at: datetime = Field(default_factory=datetime.utcnow)
-
-#     # Relationships
-#     customer: Organization = Relationship(
-#         back_populates="projects",
-#         sa_relationship_kwargs={"lazy": "selectin"},
-#     )
-#     deal_winner: User = Relationship(
-#         back_populates="won_projects",
-#         sa_relationship_kwargs={"lazy": "selectin"},
-#     )
-#     stakeholders: list[User] = Relationship(
-#         back_populates="projects",
-#         link_model=ProjectStakeholder,
-#         sa_relationship_kwargs={"lazy": "selectin"},
-#     )
-#     linked_usecases: list["Usecase"] = Relationship(
-#         back_populates="projects",
-#         link_model=ProjectUsecase,
-#         sa_relationship_kwargs={"lazy": "selectin"},
-#     )
-#     primary_usecase: Optional["Usecase"] = Relationship(
-#         sa_relationship_kwargs={"lazy": "selectin"},
-#     )
-#     generated_documents: list["GeneratedDocument"] = Relationship(
-#         back_populates="project",
-#         sa_relationship_kwargs={"lazy": "selectin"},
-#     )
-#     erp_connectors: list["ERPConnector"] = Relationship(
-#         back_populates="project",
-#         sa_relationship_kwargs={"lazy": "selectin"},
-#     )
-#     hystudio_companies: list["OrganizationHyStudioCompany"] = Relationship(
-#         back_populates="projects",
-#         link_model=HyStudioCompanyProject,
-#         sa_relationship_kwargs={"lazy": "selectin"},
-#     )
 
 
 class Project(SQLModel, table=True):
@@ -846,13 +684,13 @@ class DocumentTemplate(SQLModel, table=True):
     type: DocumentTemplateType
     markdown_content: str
     variables: list = Field(sa_column=Column(postgresql.JSONB))
-    version: int
+    version: float = 1.0
     is_active: bool
 
 
     # 🆕 File Format and Path
     file_format: str = "md"  # "md" or "docx"
-    file_path: Optional[str] = None
+    # file_path: Optional[str] = None
 
     created_by_id: UUID = Field(foreign_key="user.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)

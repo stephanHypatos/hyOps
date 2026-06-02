@@ -1,11 +1,10 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException
 from uuid import UUID
-from typing import Optional
-from sqlmodel import SQLModel, select
+from sqlmodel import select
 from app.database.models import Usecase, FeatureUsecase, Feature, Capability
 from app.database.session import SessionDep
 from app.api.schemas.usecase import UsecaseCreate, UsecaseRead, UsecaseUpdate, FeatureAssign
-from app.api.schemas.feature import FeatureReadWithCapability  # 🆕 Import enriched schema
+from app.api.schemas.feature import FeatureReadWithCapability
 
 
 router = APIRouter(prefix="/usecase", tags=["Usecase"])
