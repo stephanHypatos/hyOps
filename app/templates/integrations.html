@@ -152,7 +152,7 @@
                     <h6 class="fw-bold mb-2">📊 Metabase</h6>
 
                     <!-- Current status -->
-                    <div class="mb-3">
+                    <div class="mb-3 d-flex align-items-center gap-2">
                         <template x-if="$store.modal.metabase.external_id">
                             <span class="badge" style="background:#d1fae5;color:#065f46;font-size:0.8rem;">
                                 ✓ Linked to group: <strong x-text="$store.modal.metabase.name"></strong>
@@ -161,6 +161,13 @@
                         </template>
                         <template x-if="!$store.modal.metabase.external_id">
                             <span class="badge bg-light text-muted" style="font-size:0.8rem;">Not configured</span>
+                        </template>
+                        <template x-if="$store.modal.metabase.external_id">
+                            <button class="btn btn-sm btn-outline-danger"
+                                    :disabled="$store.modal.saving"
+                                    @click="$store.modal.unlinkMetabase()">
+                                Unlink
+                            </button>
                         </template>
                     </div>
 
@@ -286,6 +293,25 @@
             teamsMsg: '', teamsOk: true,
             slack:    { external_id: '', channel_name: '' },
             slackMsg: '', slackOk: true,
+
+            async unlinkMetabase() {
+                if (!confirm('Unlink this Metabase group from the organization?\n\nThis removes the connection in hyOps but does NOT delete the group in Metabase.')) return;
+                this.saving = true; this.metabaseMsg = '';
+                try {
+                    const r = await fetch(`/metabase/organization/${this.orgId}/group`, { method: 'DELETE' });
+                    const data = await r.json();
+                    if (r.ok) {
+                        this.metabaseOk = true;
+                        this.metabaseMsg = '✓ Unlinked successfully';
+                        this.metabase = { external_id: '', name: '' };
+                        window.integrationsApp && window.integrationsApp.reload();
+                    } else {
+                        this.metabaseOk = false;
+                        this.metabaseMsg = '✗ ' + (data.detail || 'Error unlinking');
+                    }
+                } catch(e) { this.metabaseOk = false; this.metabaseMsg = '✗ Network error'; }
+                finally { this.saving = false; }
+            },
 
             async createMetabaseGroup() {
                 this.saving = true; this.metabaseMsg = '';

@@ -164,6 +164,38 @@ async def create_metabase_group_for_org(org_id: UUID, session: SessionDep):
     }
 
 
+@router.delete("/organization/{org_id}/group")
+async def unlink_metabase_group_from_org(org_id: UUID, session: SessionDep):
+    """
+    Unlink the Metabase group from an organization.
+    Removes the OrganizationMetabaseGroup record and all UserMetabaseGroup links
+    for users in this org. Does NOT delete the group in Metabase itself.
+    """
+    from app.database.models import UserMetabaseGroup, User
+
+    result = await session.execute(
+        select(OrganizationMetabaseGroup).where(
+            OrganizationMetabaseGroup.organization_id == org_id
+        )
+    )
+    org_group = result.scalars().first()
+    if org_group is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No Metabase group linked to this organization")
+
+    # Remove all UserMetabaseGroup links for this org group
+    user_links = await session.execute(
+        select(UserMetabaseGroup).where(
+            UserMetabaseGroup.metabase_group_id == org_group.id
+        )
+    )
+    for link in user_links.scalars().all():
+        await session.delete(link)
+
+    await session.delete(org_group)
+    await session.commit()
+    return {"detail": "Metabase group unlinked from organization"}
+
+
 @router.put("/organization/{org_id}/group")
 async def assign_metabase_group_to_org(
     org_id: UUID,
