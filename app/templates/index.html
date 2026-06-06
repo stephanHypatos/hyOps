@@ -317,29 +317,7 @@
                             body: JSON.stringify(payload)
                         });
 
-                        if (response.status === 409) {
-                            const err = await response.json();
-                            const detail = err.detail || {};
-                            alert(
-                                `Cannot create organization:\n\n${detail.message || "A Metabase group with this name already exists."}\n\n` +
-                                `Existing group ID: ${detail.existing_group_id || "?"}`
-                            );
-                            return;
-                        }
-
                         if (!response.ok) throw new Error("Failed to create");
-
-                        // Show Metabase setup result if available
-                        const data = await response.json();
-                        if (data.metabase && !data.metabase.error) {
-                            const provisioned = data.metabase.users_provisioned || [];
-                            const msg = provisioned.length > 0
-                                ? `✓ Metabase group '${data.metabase.group_name}' created and ${provisioned.length} user(s) provisioned.`
-                                : `✓ Metabase group '${data.metabase.group_name}' created.`;
-                            alert(msg);
-                        } else if (data.metabase && data.metabase.error) {
-                            alert(`Organization saved, but Metabase setup failed:\n${data.metabase.error}`);
-                        }
                     }
 
                     this.resetForm();

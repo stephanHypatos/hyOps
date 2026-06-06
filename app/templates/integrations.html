@@ -149,27 +149,59 @@
 
                 <!-- Metabase -->
                 <div class="mb-4 p-3 border rounded">
-                    <h6 class="fw-bold mb-3">📊 Metabase</h6>
-                    <div class="row g-3">
-                        <div class="col-md-5">
-                            <label class="form-label">Group ID <small class="text-muted">(integer from Metabase)</small></label>
-                            <input type="text" class="form-control" placeholder="e.g. 42"
-                                   x-model="$store.modal.metabase.external_id">
-                        </div>
-                        <div class="col-md-5">
-                            <label class="form-label">Group Name</label>
-                            <input type="text" class="form-control" placeholder="e.g. ext-acme"
-                                   x-model="$store.modal.metabase.name">
-                        </div>
-                        <div class="col-md-2 d-flex align-items-end">
-                            <button class="btn btn-primary w-100"
-                                    :disabled="$store.modal.saving"
-                                    @click="$store.modal.saveMetabase()">
-                                <span x-show="!$store.modal.saving">Save</span>
-                                <span x-show="$store.modal.saving">…</span>
-                            </button>
+                    <h6 class="fw-bold mb-2">📊 Metabase</h6>
+
+                    <!-- Current status -->
+                    <div class="mb-3">
+                        <template x-if="$store.modal.metabase.external_id">
+                            <span class="badge" style="background:#d1fae5;color:#065f46;font-size:0.8rem;">
+                                ✓ Linked to group: <strong x-text="$store.modal.metabase.name"></strong>
+                                (ID: <span x-text="$store.modal.metabase.external_id"></span>)
+                            </span>
+                        </template>
+                        <template x-if="!$store.modal.metabase.external_id">
+                            <span class="badge bg-light text-muted" style="font-size:0.8rem;">Not configured</span>
+                        </template>
+                    </div>
+
+                    <!-- Option A: Create new group -->
+                    <div class="mb-3 p-2 bg-light rounded">
+                        <p class="mb-2 small fw-semibold">Option A — Create a new Metabase group for this org</p>
+                        <p class="mb-2 small text-muted">
+                            Uses the organization name as the group name. Checks for duplicates first.
+                            Also provisions all existing users in this org into the new group.
+                        </p>
+                        <button class="btn btn-sm btn-primary"
+                                :disabled="$store.modal.saving"
+                                @click="$store.modal.createMetabaseGroup()">
+                            <span x-show="!$store.modal.saving">🚀 Create group in Metabase</span>
+                            <span x-show="$store.modal.saving">Creating…</span>
+                        </button>
+                    </div>
+
+                    <!-- Option B: Link existing group -->
+                    <div class="p-2 bg-light rounded">
+                        <p class="mb-2 small fw-semibold">Option B — Link an existing Metabase group</p>
+                        <div class="row g-2">
+                            <div class="col-md-5">
+                                <input type="text" class="form-control form-control-sm" placeholder="Group ID (e.g. 42)"
+                                       x-model="$store.modal.metabase.external_id">
+                            </div>
+                            <div class="col-md-5">
+                                <input type="text" class="form-control form-control-sm" placeholder="Group name"
+                                       x-model="$store.modal.metabase.name">
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn btn-sm btn-outline-primary w-100"
+                                        :disabled="$store.modal.saving"
+                                        @click="$store.modal.saveMetabase()">
+                                    <span x-show="!$store.modal.saving">Link</span>
+                                    <span x-show="$store.modal.saving">…</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
+
                     <div x-show="$store.modal.metabaseMsg" class="mt-2 small"
                          :class="$store.modal.metabaseOk ? 'text-success' : 'text-danger'"
                          x-text="$store.modal.metabaseMsg"></div>
@@ -255,6 +287,34 @@
             slack:    { external_id: '', channel_name: '' },
             slackMsg: '', slackOk: true,
 
+            async createMetabaseGroup() {
+                this.saving = true; this.metabaseMsg = '';
+                try {
+                    const r = await fetch(`/metabase/organization/${this.orgId}/create-group`, {
+                        method: 'POST'
+                    });
+                    const data = await r.json();
+                    if (r.ok) {
+                        this.metabaseOk = true;
+                        const provisioned = data.users_provisioned || [];
+                        this.metabaseMsg = provisioned.length > 0
+                            ? `✓ Group '${data.metabase_group_name}' created and ${provisioned.length} user(s) provisioned`
+                            : `✓ Group '${data.metabase_group_name}' created (ID: ${data.metabase_group_id})`;
+                        this.metabase.external_id = String(data.metabase_group_id);
+                        this.metabase.name = data.metabase_group_name;
+                        window.integrationsApp && window.integrationsApp.reload();
+                    } else if (r.status === 409) {
+                        this.metabaseOk = false;
+                        const detail = data.detail || {};
+                        this.metabaseMsg = `✗ ${detail.message || 'A group with this name already exists'} — use Option B to link it (ID: ${detail.existing_group_id || '?'})`;
+                    } else {
+                        this.metabaseOk = false;
+                        this.metabaseMsg = '✗ ' + (data.detail || 'Error creating group');
+                    }
+                } catch(e) { this.metabaseOk = false; this.metabaseMsg = '✗ Network error'; }
+                finally { this.saving = false; }
+            },
+
             async saveMetabase() {
                 this.saving = true; this.metabaseMsg = '';
                 try {
@@ -265,9 +325,9 @@
                     });
                     const data = await r.json();
                     this.metabaseOk = r.ok;
-                    this.metabaseMsg = r.ok ? '✓ Saved' : (data.detail || 'Error saving');
+                    this.metabaseMsg = r.ok ? '✓ Linked' : (data.detail || 'Error saving');
                     if (r.ok) window.integrationsApp && window.integrationsApp.reload();
-                } catch(e) { this.metabaseOk = false; this.metabaseMsg = 'Network error'; }
+                } catch(e) { this.metabaseOk = false; this.metabaseMsg = '✗ Network error'; }
                 finally { this.saving = false; }
             },
 

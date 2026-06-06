@@ -70,6 +70,100 @@ async def get_metabase_group_for_org(org_id: UUID, session: SessionDep):
     return {"external_id": group.external_id, "name": group.name, "id": str(group.id)}
 
 
+@router.post("/organization/{org_id}/create-group")
+async def create_metabase_group_for_org(org_id: UUID, session: SessionDep):
+    """
+    Manually trigger Metabase group creation for an organization.
+    - Checks if a group with the org's name already exists in Metabase → returns 409 if so.
+    - Creates the group, writes the ID back to the DB.
+    - Provisions all existing users of this org into the new group.
+    """
+    org = await session.get(Organization, org_id)
+    if org is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
+
+    try:
+        mb_group = await mb_adapter.create_group(org.name.strip())
+    except RuntimeError as e:
+        error_str = str(e)
+        if error_str.startswith("DUPLICATE_GROUP:"):
+            parts = error_str.split(":", 2)
+            existing_id = parts[1] if len(parts) > 1 else "?"
+            existing_name = parts[2] if len(parts) > 2 else org.name
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "error": "METABASE_GROUP_EXISTS",
+                    "message": f"A Metabase group named '{existing_name}' already exists (ID: {existing_id}). "
+                               f"Use 'Link existing group' to connect it manually.",
+                    "existing_group_id": existing_id,
+                    "existing_group_name": existing_name,
+                }
+            )
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(e))
+
+    # Write the new group back to the DB
+    result = await session.execute(
+        select(OrganizationMetabaseGroup).where(
+            OrganizationMetabaseGroup.organization_id == org_id
+        )
+    )
+    org_mb_group = result.scalars().first()
+    if org_mb_group:
+        org_mb_group.external_id = str(mb_group["id"])
+        org_mb_group.name = mb_group["name"]
+    else:
+        org_mb_group = OrganizationMetabaseGroup(
+            organization_id=org_id,
+            external_id=str(mb_group["id"]),
+            name=mb_group["name"],
+        )
+    session.add(org_mb_group)
+    await session.commit()
+    await session.refresh(org_mb_group)
+
+    # Provision all existing users of this org into the new group
+    from app.database.models import User, UserMetabaseGroup
+    users_result = await session.execute(
+        select(User).where(User.organization_id == org_id)
+    )
+    existing_users = users_result.scalars().all()
+    provisioned = []
+    failed = []
+    for user in existing_users:
+        try:
+            prov = await mb_adapter.provision_user(
+                email=user.email,
+                firstname=user.first_name,
+                lastname=user.last_name,
+                group_id=mb_group["id"],
+            )
+            user.metabase_user_id = prov["metabase_user_id"]
+            session.add(user)
+
+            link_check = await session.execute(
+                select(UserMetabaseGroup).where(
+                    UserMetabaseGroup.user_id == user.id,
+                    UserMetabaseGroup.metabase_group_id == org_mb_group.id,
+                )
+            )
+            if link_check.scalars().first() is None:
+                session.add(UserMetabaseGroup(user_id=user.id, metabase_group_id=org_mb_group.id))
+            provisioned.append(user.email)
+        except Exception as ex:
+            failed.append({"email": user.email, "error": str(ex)})
+
+    if provisioned:
+        await session.commit()
+
+    return {
+        "metabase_group_id": mb_group["id"],
+        "metabase_group_name": mb_group["name"],
+        "users_provisioned": provisioned,
+        "users_failed": failed,
+    }
+
+
 @router.put("/organization/{org_id}/group")
 async def assign_metabase_group_to_org(
     org_id: UUID,
