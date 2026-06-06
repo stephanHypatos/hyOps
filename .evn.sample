@@ -1,1 +1,20 @@
-POSTGRESQL_URL=
+# ── Database ──────────────────────────────────────────────────────────────────
+POSTGRESQL_URL=postgresql+asyncpg://<user>:<password>@<host>:<port>/<db>
+
+# ── Metabase ──────────────────────────────────────────────────────────────────
+METABASE_URL=https://your-instance.metabase.com
+METABASE_API_KEY=mb_your_api_key_here
+
+# ── Microsoft Teams (Azure AD) ────────────────────────────────────────────────
+# Required Azure app permissions: User.Invite.All, TeamMember.ReadWrite.All
+AZURE_TENANT_ID=
+AZURE_CLIENT_ID=
+AZURE_CLIENT_SECRET=
+TEAMS_TEAM_ID=
+
+# ── Email (SMTP) ──────────────────────────────────────────────────────────────
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=sender@example.com
+SMTP_PASSWORD=
+EMAIL_FROM=hyOps <noreply@example.com>

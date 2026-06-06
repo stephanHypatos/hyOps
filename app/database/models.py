@@ -309,6 +309,7 @@ class User(SQLModel, table=True):
     last_name: str
     email: EmailStr
     phone: str
+    metabase_user_id: Optional[int] = Field(default=None)  # cached Metabase internal user ID
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
