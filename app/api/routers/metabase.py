@@ -9,10 +9,13 @@ User-level:  POST   /metabase/user/{user_id}/provision
              DELETE /metabase/user/{user_id}/group/{group_id}
 """
 
+import logging
 from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
+
+logger = logging.getLogger(__name__)
 from pydantic import BaseModel
 from sqlmodel import select
 
@@ -100,7 +103,14 @@ async def create_metabase_group_for_org(org_id: UUID, session: SessionDep):
                     "existing_group_name": existing_name,
                 }
             )
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(e))
+        logger.error("Metabase create_group failed: %s", error_str)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=error_str)
+    except Exception as e:
+        logger.error("Metabase create_group unexpected error: %s", str(e), exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"{type(e).__name__}: {str(e)}"
+        )
 
     # Write the new group back to the DB
     result = await session.execute(

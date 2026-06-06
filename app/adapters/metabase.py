@@ -9,14 +9,17 @@ Credentials (set in .env):
 """
 
 import asyncio
+import logging
 from typing import Optional
 
 import httpx
 
 from app.config import integration_settings
 
-_TIMEOUT = 10
+_TIMEOUT = 30  # seconds — Metabase can be slow on writes
 _SYSTEM_GROUP_IDS = {1, 2}  # All Users, Administrators — never shown in UI
+
+logger = logging.getLogger(__name__)
 
 
 def _base() -> str:
@@ -171,6 +174,7 @@ def _get_group_by_name_sync(name: str) -> Optional[dict]:
     or None if it doesn't. Case-insensitive comparison.
     """
     _check_config()
+    logger.info("Metabase: checking for existing group named '%s'", name)
     resp = httpx.get(
         f"{_base()}/api/permissions/group",
         headers=_headers(),
@@ -180,7 +184,9 @@ def _get_group_by_name_sync(name: str) -> Optional[dict]:
     normalized = name.strip().lower()
     for g in resp.json():
         if g.get("name", "").strip().lower() == normalized:
+            logger.info("Metabase: found existing group '%s' (ID: %s)", g["name"], g["id"])
             return {"id": g["id"], "name": g["name"]}
+    logger.info("Metabase: no existing group found for '%s'", name)
     return None
 
 
@@ -196,14 +202,17 @@ def _create_group_sync(name: str) -> dict:
         raise RuntimeError(
             f"DUPLICATE_GROUP:{existing['id']}:{existing['name']}"
         )
+    logger.info("Metabase: creating group '%s'", name)
     resp = httpx.post(
         f"{_base()}/api/permissions/group",
         json={"name": name},
         headers=_headers(),
         timeout=_TIMEOUT,
     )
+    logger.info("Metabase: create group response status=%s", resp.status_code)
     resp.raise_for_status()
     data = resp.json()
+    logger.info("Metabase: group created — ID=%s name='%s'", data["id"], data["name"])
     return {"id": data["id"], "name": data["name"]}
 
 
