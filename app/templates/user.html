@@ -182,9 +182,12 @@
             <div class="modal-body" id="intModalBody">
                 <!-- Metabase -->
                 <div class="mb-4 p-3 border rounded">
-                    <h6 class="fw-bold mb-3">📊 Metabase</h6>
-                    <div id="mbStatus" class="mb-2 small text-muted">Loading…</div>
-                    <div id="mbMemberships" class="mb-2"></div>
+                    <h6 class="fw-bold mb-2">📊 Metabase</h6>
+                    <div id="mbStatus" class="mb-3 small"></div>
+
+                    <!-- Group memberships -->
+                    <div id="mbMemberships" class="mb-3"></div>
+
                     <button class="btn btn-sm btn-primary" id="btnProvisionMb">Provision to Metabase</button>
                     <div id="mbActionMsg" class="mt-2 small"></div>
                 </div>
@@ -381,43 +384,67 @@
                 const name = `${user.first_name} ${user.last_name}`;
                 document.getElementById('intModalUserName').textContent = name;
 
-                // Reset UI
-                const mbStatus = document.getElementById('mbStatus');
+                const mbStatus      = document.getElementById('mbStatus');
                 const mbMemberships = document.getElementById('mbMemberships');
-                const mbMsg = document.getElementById('mbActionMsg');
-                const teamsStatus = document.getElementById('teamsStatus');
-                const teamsMsg = document.getElementById('teamsActionMsg');
-                const slackStatus = document.getElementById('slackStatus');
-                const slackMsg = document.getElementById('slackActionMsg');
+                const mbMsg         = document.getElementById('mbActionMsg');
+                const teamsStatus   = document.getElementById('teamsStatus');
+                const teamsMsg      = document.getElementById('teamsActionMsg');
+                const slackStatus   = document.getElementById('slackStatus');
+                const slackMsg      = document.getElementById('slackActionMsg');
 
-                mbStatus.textContent = 'Loading…'; mbStatus.className = 'mb-2 small text-muted';
+                // Reset
+                mbStatus.innerHTML = '<span class="text-muted">Loading…</span>';
                 mbMemberships.innerHTML = '';
                 mbMsg.textContent = '';
                 teamsStatus.textContent = '—'; teamsMsg.textContent = '';
                 slackStatus.textContent = '—'; slackMsg.textContent = '';
 
-                // Load Metabase status
-                if (user.metabase_user_id) {
-                    mbStatus.textContent = `✓ Provisioned (Metabase ID: ${user.metabase_user_id})`;
-                    mbStatus.className = 'mb-2 small text-success';
+                // Always fetch live membership state from the API
+                const loadMbMemberships = () => {
+                    mbMemberships.innerHTML = '<span class="text-muted small">Loading memberships…</span>';
                     fetch(`/metabase/user/${user.id}/memberships`)
-                        .then(r => r.json()).then(data => {
-                            if (data.memberships && data.memberships.length > 0) {
-                                mbMemberships.innerHTML = data.memberships.map(m =>
-                                    `<span class="badge bg-light text-dark border me-1">${m.group_name}
-                                     <button class="btn-close btn-close-sm ms-1" style="font-size:0.6rem"
-                                       onclick="removeFromMbGroup('${user.id}', ${m.group_id}, ${user.metabase_user_id}, this)"></button></span>`
-                                ).join('');
-                            } else {
-                                mbMemberships.innerHTML = '<span class="text-muted small">No group memberships</span>';
+                        .then(async r => {
+                            if (r.status === 404) {
+                                // User not provisioned yet
+                                mbStatus.innerHTML = '<span class="text-muted">Not provisioned in Metabase yet</span>';
+                                mbMemberships.innerHTML = '';
+                                return;
                             }
-                        }).catch(() => {});
-                } else {
-                    mbStatus.textContent = 'Not provisioned yet';
-                    mbStatus.className = 'mb-2 small text-muted';
-                }
+                            const data = await r.json();
+                            mbStatus.innerHTML = `<span class="text-success">✓ Provisioned (Metabase ID: ${data.metabase_user_id})</span>`;
+                            if (data.memberships && data.memberships.length > 0) {
+                                mbMemberships.innerHTML = `
+                                    <p class="small fw-semibold mb-1 text-muted">Group memberships</p>
+                                    <table class="table table-sm table-bordered mb-0" style="font-size:0.85rem;">
+                                        <thead class="table-light">
+                                            <tr><th>Group</th><th style="width:90px;">Action</th></tr>
+                                        </thead>
+                                        <tbody>
+                                            ${data.memberships.map(m => `
+                                                <tr id="mb-row-${m.group_id}">
+                                                    <td>${m.group_name}</td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-outline-danger"
+                                                            onclick="removeFromMbGroup('${user.id}', ${m.group_id}, this)">
+                                                            Remove
+                                                        </button>
+                                                    </td>
+                                                </tr>`).join('')}
+                                        </tbody>
+                                    </table>`;
+                            } else {
+                                mbMemberships.innerHTML = '<p class="small text-muted mb-0">No group memberships yet.</p>';
+                            }
+                        })
+                        .catch(() => {
+                            mbStatus.innerHTML = '<span class="text-muted">Not provisioned in Metabase yet</span>';
+                            mbMemberships.innerHTML = '';
+                        });
+                };
 
-                // Provision button
+                loadMbMemberships();
+
+                // Provision button — refreshes memberships after success
                 const btnMb = document.getElementById('btnProvisionMb');
                 btnMb.onclick = async () => {
                     btnMb.disabled = true; btnMb.textContent = 'Provisioning…';
@@ -428,9 +455,8 @@
                         if (r.ok) {
                             mbMsg.textContent = data.created ? '✓ User created and added to group' : '✓ User already existed — added to group';
                             mbMsg.className = 'mt-2 small text-success';
-                            mbStatus.textContent = `✓ Provisioned (Metabase ID: ${data.metabase_user_id})`;
-                            mbStatus.className = 'mb-2 small text-success';
-                            user.metabase_user_id = data.metabase_user_id;
+                            loadMbMemberships(); // refresh live
+                            await this.fetchUsers(); // sync Alpine data
                         } else {
                             mbMsg.textContent = '✗ ' + (data.detail || 'Error');
                             mbMsg.className = 'mt-2 small text-danger';
@@ -498,18 +524,33 @@
 </script>
 
 <script>
-    async function removeFromMbGroup(userId, groupId, mbUserId, btn) {
-        if (!confirm('Remove user from this Metabase group?')) return;
+    async function removeFromMbGroup(userId, groupId, btn) {
+        if (!confirm('Remove this user from the Metabase group?')) return;
         btn.disabled = true;
+        btn.textContent = 'Removing…';
         try {
             const r = await fetch(`/metabase/user/${userId}/group/${groupId}`, { method: 'DELETE' });
             if (r.ok) {
-                btn.closest('span').remove();
+                // Remove the row from the table
+                const row = document.getElementById(`mb-row-${groupId}`);
+                if (row) row.remove();
+                // If table body is now empty, show placeholder
+                const tbody = document.querySelector('#mbMemberships tbody');
+                if (tbody && tbody.children.length === 0) {
+                    document.getElementById('mbMemberships').innerHTML =
+                        '<p class="small text-muted mb-0">No group memberships yet.</p>';
+                }
             } else {
-                alert('Failed to remove from group');
+                const data = await r.json().catch(() => ({}));
+                alert('Failed to remove: ' + (data.detail || 'Unknown error'));
                 btn.disabled = false;
+                btn.textContent = 'Remove';
             }
-        } catch(e) { alert('Network error'); btn.disabled = false; }
+        } catch(e) {
+            alert('Network error');
+            btn.disabled = false;
+            btn.textContent = 'Remove';
+        }
     }
 </script>
 </body>
