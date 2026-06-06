@@ -34,6 +34,20 @@ class SlackChannelAssign(BaseModel):
 
 # ── Org-level ─────────────────────────────────────────────────────────────────
 
+@router.get("/organization/{org_id}/channel")
+async def get_slack_channel_for_org(org_id: UUID, session: SessionDep):
+    """Get the Slack channel configured for an organization."""
+    result = await session.execute(
+        select(OrganizationSlackChannel).where(
+            OrganizationSlackChannel.organization_id == org_id
+        )
+    )
+    channel = result.scalars().first()
+    if channel is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No Slack channel configured for this organization")
+    return {"external_id": channel.external_id, "channel_name": channel.channel_name, "id": str(channel.id)}
+
+
 @router.put("/organization/{org_id}/channel")
 async def assign_slack_channel_to_org(
     org_id: UUID,

@@ -32,6 +32,20 @@ class TeamsGroupAssign(BaseModel):
 
 # ── Org-level ─────────────────────────────────────────────────────────────────
 
+@router.get("/organization/{org_id}/group")
+async def get_teams_group_for_org(org_id: UUID, session: SessionDep):
+    """Get the Teams group configured for an organization."""
+    result = await session.execute(
+        select(OrganizationTeamsGroup).where(
+            OrganizationTeamsGroup.organization_id == org_id
+        )
+    )
+    group = result.scalars().first()
+    if group is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No Teams group configured for this organization")
+    return {"external_id": group.external_id, "name": group.name, "id": str(group.id)}
+
+
 @router.put("/organization/{org_id}/group")
 async def assign_teams_group_to_org(
     org_id: UUID,

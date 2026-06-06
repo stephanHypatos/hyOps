@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Integrations</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .sidebar { width: 260px; flex-basis: 260px; flex-shrink: 0; min-height: 100vh; }
+        .sidebar .nav-link { color: rgba(255,255,255,0.75); border-radius: 5px; margin-bottom: 5px; }
+        .sidebar .nav-link:hover { color: #fff; background-color: rgba(255,255,255,0.1); }
+        .sidebar .nav-link.active { color: #fff; background-color: #0d6efd; }
+        @media (max-width: 767.98px) { .sidebar { width: 100%; flex-basis: 100%; min-height: auto; } }
+
+        .integration-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            font-size: 0.75rem; padding: 0.25em 0.6em;
+            border-radius: 0.375rem; font-weight: 500;
+        }
+        .badge-configured { background-color: #d1fae5; color: #065f46; }
+        .badge-not-configured { background-color: #f3f4f6; color: #6b7280; }
+        .status-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+        .dot-green { background: #10b981; }
+        .dot-gray  { background: #9ca3af; }
+    </style>
+</head>
+<body class="bg-light">
+
+<div class="d-flex flex-md-row flex-column" x-data="integrationsManager()" x-init="init()">
+
+    {% include "components/sidebar.html" %}
+
+    <main class="flex-grow-1 p-4 overflow-auto">
+        <h1 class="mb-1">Integrations</h1>
+        <p class="text-muted mb-4">Configure third-party integration settings per organization.</p>
+
+        <!-- Status banner -->
+        <div x-show="banner.show" x-transition
+             :class="banner.ok ? 'alert alert-success' : 'alert alert-danger'"
+             class="alert d-flex align-items-center mb-4" role="alert">
+            <span x-text="banner.msg"></span>
+            <button type="button" class="btn-close ms-auto" @click="banner.show=false"></button>
+        </div>
+
+        <!-- Organizations table -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Organization Integration Settings</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Organization</th>
+                                <th>Type</th>
+                                <th>Metabase Group</th>
+                                <th>Teams Group</th>
+                                <th>Slack Channel</th>
+                                <th style="width:100px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr x-show="loading">
+                                <td colspan="6" class="text-center text-muted py-4">Loading…</td>
+                            </tr>
+                            <tr x-show="!loading && orgs.length === 0">
+                                <td colspan="6" class="text-center text-muted py-4">No organizations found.</td>
+                            </tr>
+                            <template x-for="org in orgs" :key="org.id">
+                                <tr>
+                                    <td class="fw-semibold" x-text="org.name"></td>
+                                    <td>
+                                        <span class="badge text-capitalize"
+                                              :class="org.type === 'customer' ? 'bg-primary' : org.type === 'partner' ? 'bg-success' : 'bg-info'"
+                                              x-text="org.type"></span>
+                                    </td>
+
+                                    <!-- Metabase -->
+                                    <td>
+                                        <template x-if="org._metabase">
+                                            <span class="integration-badge badge-configured">
+                                                <span class="status-dot dot-green"></span>
+                                                <span x-text="org._metabase.name"></span>
+                                            </span>
+                                        </template>
+                                        <template x-if="!org._metabase">
+                                            <span class="integration-badge badge-not-configured">
+                                                <span class="status-dot dot-gray"></span>
+                                                Not configured
+                                            </span>
+                                        </template>
+                                    </td>
+
+                                    <!-- Teams -->
+                                    <td>
+                                        <template x-if="org._teams">
+                                            <span class="integration-badge badge-configured">
+                                                <span class="status-dot dot-green"></span>
+                                                <span x-text="org._teams.name"></span>
+                                            </span>
+                                        </template>
+                                        <template x-if="!org._teams">
+                                            <span class="integration-badge badge-not-configured">
+                                                <span class="status-dot dot-gray"></span>
+                                                Not configured
+                                            </span>
+                                        </template>
+                                    </td>
+
+                                    <!-- Slack -->
+                                    <td>
+                                        <template x-if="org._slack">
+                                            <span class="integration-badge badge-configured">
+                                                <span class="status-dot dot-green"></span>
+                                                <span x-text="org._slack.channel_name"></span>
+                                            </span>
+                                        </template>
+                                        <template x-if="!org._slack">
+                                            <span class="integration-badge badge-not-configured">
+                                                <span class="status-dot dot-gray"></span>
+                                                Not configured
+                                            </span>
+                                        </template>
+                                    </td>
+
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary" @click="openModal(org)">Configure</button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- ── Configure Modal ───────────────────────────────────────────────────── -->
+<div class="modal fade" id="configModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content" x-data>
+            <div class="modal-header">
+                <h5 class="modal-title">Configure Integrations — <span x-text="$store.modal.orgName"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+
+                <!-- Metabase -->
+                <div class="mb-4 p-3 border rounded">
+                    <h6 class="fw-bold mb-3">📊 Metabase</h6>
+                    <div class="row g-3">
+                        <div class="col-md-5">
+                            <label class="form-label">Group ID <small class="text-muted">(integer from Metabase)</small></label>
+                            <input type="text" class="form-control" placeholder="e.g. 42"
+                                   x-model="$store.modal.metabase.external_id">
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">Group Name</label>
+                            <input type="text" class="form-control" placeholder="e.g. ext-acme"
+                                   x-model="$store.modal.metabase.name">
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button class="btn btn-primary w-100"
+                                    :disabled="$store.modal.saving"
+                                    @click="$store.modal.saveMetabase()">
+                                <span x-show="!$store.modal.saving">Save</span>
+                                <span x-show="$store.modal.saving">…</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div x-show="$store.modal.metabaseMsg" class="mt-2 small"
+                         :class="$store.modal.metabaseOk ? 'text-success' : 'text-danger'"
+                         x-text="$store.modal.metabaseMsg"></div>
+                </div>
+
+                <!-- Teams -->
+                <div class="mb-4 p-3 border rounded">
+                    <h6 class="fw-bold mb-3">💬 Microsoft Teams</h6>
+                    <div class="row g-3">
+                        <div class="col-md-5">
+                            <label class="form-label">Team ID <small class="text-muted">(Microsoft 365 Group ID)</small></label>
+                            <input type="text" class="form-control" placeholder="e.g. xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                                   x-model="$store.modal.teams.external_id">
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">Team Name</label>
+                            <input type="text" class="form-control" placeholder="e.g. ext-acme"
+                                   x-model="$store.modal.teams.name">
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button class="btn btn-primary w-100"
+                                    :disabled="$store.modal.saving"
+                                    @click="$store.modal.saveTeams()">
+                                <span x-show="!$store.modal.saving">Save</span>
+                                <span x-show="$store.modal.saving">…</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div x-show="$store.modal.teamsMsg" class="mt-2 small"
+                         :class="$store.modal.teamsOk ? 'text-success' : 'text-danger'"
+                         x-text="$store.modal.teamsMsg"></div>
+                </div>
+
+                <!-- Slack -->
+                <div class="p-3 border rounded">
+                    <h6 class="fw-bold mb-3">💬 Slack</h6>
+                    <div class="row g-3">
+                        <div class="col-md-5">
+                            <label class="form-label">Channel ID <small class="text-muted">(e.g. C01234ABCDE)</small></label>
+                            <input type="text" class="form-control" placeholder="e.g. C01234ABCDE"
+                                   x-model="$store.modal.slack.external_id">
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">Channel Name</label>
+                            <input type="text" class="form-control" placeholder="e.g. ext-acme"
+                                   x-model="$store.modal.slack.channel_name">
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button class="btn btn-primary w-100"
+                                    :disabled="$store.modal.saving"
+                                    @click="$store.modal.saveSlack()">
+                                <span x-show="!$store.modal.saving">Save</span>
+                                <span x-show="$store.modal.saving">…</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div x-show="$store.modal.slackMsg" class="mt-2 small"
+                         :class="$store.modal.slackOk ? 'text-success' : 'text-danger'"
+                         x-text="$store.modal.slackMsg"></div>
+                </div>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.store('modal', {
+            orgId: null,
+            orgName: '',
+            saving: false,
+            metabase: { external_id: '', name: '' },
+            metabaseMsg: '', metabaseOk: true,
+            teams:    { external_id: '', name: '' },
+            teamsMsg: '', teamsOk: true,
+            slack:    { external_id: '', channel_name: '' },
+            slackMsg: '', slackOk: true,
+
+            async saveMetabase() {
+                this.saving = true; this.metabaseMsg = '';
+                try {
+                    const r = await fetch(`/metabase/organization/${this.orgId}/group`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.metabase)
+                    });
+                    const data = await r.json();
+                    this.metabaseOk = r.ok;
+                    this.metabaseMsg = r.ok ? '✓ Saved' : (data.detail || 'Error saving');
+                    if (r.ok) window.integrationsApp && window.integrationsApp.reload();
+                } catch(e) { this.metabaseOk = false; this.metabaseMsg = 'Network error'; }
+                finally { this.saving = false; }
+            },
+
+            async saveTeams() {
+                this.saving = true; this.teamsMsg = '';
+                try {
+                    const r = await fetch(`/teams/organization/${this.orgId}/group`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.teams)
+                    });
+                    const data = await r.json();
+                    this.teamsOk = r.ok;
+                    this.teamsMsg = r.ok ? '✓ Saved' : (data.detail || 'Error saving');
+                    if (r.ok) window.integrationsApp && window.integrationsApp.reload();
+                } catch(e) { this.teamsOk = false; this.teamsMsg = 'Network error'; }
+                finally { this.saving = false; }
+            },
+
+            async saveSlack() {
+                this.saving = true; this.slackMsg = '';
+                try {
+                    const r = await fetch(`/slack/organization/${this.orgId}/channel`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.slack)
+                    });
+                    const data = await r.json();
+                    this.slackOk = r.ok;
+                    this.slackMsg = r.ok ? '✓ Saved' : (data.detail || 'Error saving');
+                    if (r.ok) window.integrationsApp && window.integrationsApp.reload();
+                } catch(e) { this.slackOk = false; this.slackMsg = 'Network error'; }
+                finally { this.saving = false; }
+            }
+        });
+    });
+
+    function integrationsManager() {
+        return {
+            orgs: [],
+            loading: true,
+            banner: { show: false, ok: true, msg: '' },
+            _modal: null,
+
+            async init() {
+                window.integrationsApp = this;
+                await this.fetchOrgs();
+                this._modal = new bootstrap.Modal(document.getElementById('configModal'));
+            },
+
+            async fetchOrgs() {
+                this.loading = true;
+                try {
+                    // Fetch orgs
+                    const orgsRes = await fetch('/organization/organizations');
+                    const orgs = await orgsRes.json();
+
+                    // Fetch integration data for each org in parallel
+                    await Promise.all(orgs.map(async org => {
+                        const [mbRes, teamsRes, slackRes] = await Promise.all([
+                            fetch(`/metabase/organization/${org.id}/group`).catch(() => null),
+                            fetch(`/teams/organization/${org.id}/group`).catch(() => null),
+                            fetch(`/slack/organization/${org.id}/channel`).catch(() => null),
+                        ]);
+                        org._metabase = mbRes && mbRes.ok ? await mbRes.json() : null;
+                        org._teams    = teamsRes && teamsRes.ok ? await teamsRes.json() : null;
+                        org._slack    = slackRes && slackRes.ok ? await slackRes.json() : null;
+                    }));
+
+                    this.orgs = orgs;
+                } catch(e) {
+                    console.error(e);
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            reload() { this.fetchOrgs(); },
+
+            openModal(org) {
+                const s = Alpine.store('modal');
+                s.orgId   = org.id;
+                s.orgName = org.name;
+                s.metabase = org._metabase
+                    ? { external_id: org._metabase.external_id, name: org._metabase.name }
+                    : { external_id: '', name: '' };
+                s.teams = org._teams
+                    ? { external_id: org._teams.external_id, name: org._teams.name }
+                    : { external_id: '', name: '' };
+                s.slack = org._slack
+                    ? { external_id: org._slack.external_id, channel_name: org._slack.channel_name }
+                    : { external_id: '', channel_name: '' };
+                s.metabaseMsg = ''; s.teamsMsg = ''; s.slackMsg = '';
+                this._modal.show();
+            }
+        }
+    }
+</script>
+
+</body>
+</html>

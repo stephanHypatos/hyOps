@@ -158,6 +158,7 @@
                                     <td>
                                         <button class="btn btn-sm btn-outline-warning" @click="editUser(user)">Edit</button>
                                         <button class="btn btn-sm btn-outline-danger" @click="deleteUser(user)">Delete</button>
+                                        <button class="btn btn-sm btn-outline-secondary" @click="openIntegrations(user)">🔗</button>
                                     </td>
                                 </tr>
                             </template>
@@ -168,6 +169,45 @@
         </div>
 
     </main>
+</div>
+
+<!-- ── User Integrations Modal ─────────────────────────────────────────────── -->
+<div class="modal fade" id="userIntegrationsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">🔗 Integrations — <span id="intModalUserName"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="intModalBody">
+                <!-- Metabase -->
+                <div class="mb-4 p-3 border rounded">
+                    <h6 class="fw-bold mb-3">📊 Metabase</h6>
+                    <div id="mbStatus" class="mb-2 small text-muted">Loading…</div>
+                    <div id="mbMemberships" class="mb-2"></div>
+                    <button class="btn btn-sm btn-primary" id="btnProvisionMb">Provision to Metabase</button>
+                    <div id="mbActionMsg" class="mt-2 small"></div>
+                </div>
+                <!-- Teams -->
+                <div class="mb-4 p-3 border rounded">
+                    <h6 class="fw-bold mb-3">💬 Microsoft Teams</h6>
+                    <div id="teamsStatus" class="mb-2 small text-muted">—</div>
+                    <button class="btn btn-sm btn-primary" id="btnAddTeams">Add to Teams</button>
+                    <div id="teamsActionMsg" class="mt-2 small"></div>
+                </div>
+                <!-- Slack -->
+                <div class="p-3 border rounded">
+                    <h6 class="fw-bold mb-3">💬 Slack</h6>
+                    <div id="slackStatus" class="mb-2 small text-muted">—</div>
+                    <button class="btn btn-sm btn-primary" id="btnAddSlack">Add to Slack</button>
+                    <div id="slackActionMsg" class="mt-2 small"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Bootstrap 5 JS Bundle -->
@@ -336,6 +376,114 @@
                 return name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
             },
 
+            // Open integrations modal for a user
+            openIntegrations(user) {
+                const name = `${user.first_name} ${user.last_name}`;
+                document.getElementById('intModalUserName').textContent = name;
+
+                // Reset UI
+                const mbStatus = document.getElementById('mbStatus');
+                const mbMemberships = document.getElementById('mbMemberships');
+                const mbMsg = document.getElementById('mbActionMsg');
+                const teamsStatus = document.getElementById('teamsStatus');
+                const teamsMsg = document.getElementById('teamsActionMsg');
+                const slackStatus = document.getElementById('slackStatus');
+                const slackMsg = document.getElementById('slackActionMsg');
+
+                mbStatus.textContent = 'Loading…'; mbStatus.className = 'mb-2 small text-muted';
+                mbMemberships.innerHTML = '';
+                mbMsg.textContent = '';
+                teamsStatus.textContent = '—'; teamsMsg.textContent = '';
+                slackStatus.textContent = '—'; slackMsg.textContent = '';
+
+                // Load Metabase status
+                if (user.metabase_user_id) {
+                    mbStatus.textContent = `✓ Provisioned (Metabase ID: ${user.metabase_user_id})`;
+                    mbStatus.className = 'mb-2 small text-success';
+                    fetch(`/metabase/user/${user.id}/memberships`)
+                        .then(r => r.json()).then(data => {
+                            if (data.memberships && data.memberships.length > 0) {
+                                mbMemberships.innerHTML = data.memberships.map(m =>
+                                    `<span class="badge bg-light text-dark border me-1">${m.group_name}
+                                     <button class="btn-close btn-close-sm ms-1" style="font-size:0.6rem"
+                                       onclick="removeFromMbGroup('${user.id}', ${m.group_id}, ${user.metabase_user_id}, this)"></button></span>`
+                                ).join('');
+                            } else {
+                                mbMemberships.innerHTML = '<span class="text-muted small">No group memberships</span>';
+                            }
+                        }).catch(() => {});
+                } else {
+                    mbStatus.textContent = 'Not provisioned yet';
+                    mbStatus.className = 'mb-2 small text-muted';
+                }
+
+                // Provision button
+                const btnMb = document.getElementById('btnProvisionMb');
+                btnMb.onclick = async () => {
+                    btnMb.disabled = true; btnMb.textContent = 'Provisioning…';
+                    mbMsg.textContent = ''; mbMsg.className = 'mt-2 small';
+                    try {
+                        const r = await fetch(`/metabase/user/${user.id}/provision`, { method: 'POST' });
+                        const data = await r.json();
+                        if (r.ok) {
+                            mbMsg.textContent = data.created ? '✓ User created and added to group' : '✓ User already existed — added to group';
+                            mbMsg.className = 'mt-2 small text-success';
+                            mbStatus.textContent = `✓ Provisioned (Metabase ID: ${data.metabase_user_id})`;
+                            mbStatus.className = 'mb-2 small text-success';
+                            user.metabase_user_id = data.metabase_user_id;
+                        } else {
+                            mbMsg.textContent = '✗ ' + (data.detail || 'Error');
+                            mbMsg.className = 'mt-2 small text-danger';
+                        }
+                    } catch(e) { mbMsg.textContent = '✗ Network error'; mbMsg.className = 'mt-2 small text-danger'; }
+                    btnMb.disabled = false; btnMb.textContent = 'Provision to Metabase';
+                };
+
+                // Teams button
+                const btnTeams = document.getElementById('btnAddTeams');
+                btnTeams.onclick = async () => {
+                    btnTeams.disabled = true; btnTeams.textContent = 'Adding…';
+                    teamsMsg.textContent = ''; teamsMsg.className = 'mt-2 small';
+                    try {
+                        const r = await fetch(`/teams/user/${user.id}/add`, { method: 'POST' });
+                        const data = await r.json();
+                        if (r.ok) {
+                            teamsMsg.textContent = `✓ Added to ${data.teams_group}`;
+                            teamsMsg.className = 'mt-2 small text-success';
+                            teamsStatus.textContent = `✓ Member of ${data.teams_group}`;
+                            teamsStatus.className = 'mb-2 small text-success';
+                        } else {
+                            teamsMsg.textContent = '✗ ' + (data.detail || 'Error');
+                            teamsMsg.className = 'mt-2 small text-danger';
+                        }
+                    } catch(e) { teamsMsg.textContent = '✗ Network error'; teamsMsg.className = 'mt-2 small text-danger'; }
+                    btnTeams.disabled = false; btnTeams.textContent = 'Add to Teams';
+                };
+
+                // Slack button
+                const btnSlack = document.getElementById('btnAddSlack');
+                btnSlack.onclick = async () => {
+                    btnSlack.disabled = true; btnSlack.textContent = 'Adding…';
+                    slackMsg.textContent = ''; slackMsg.className = 'mt-2 small';
+                    try {
+                        const r = await fetch(`/slack/user/${user.id}/add`, { method: 'POST' });
+                        const data = await r.json();
+                        if (r.ok) {
+                            slackMsg.textContent = `✓ Linked to ${data.slack_channel}`;
+                            slackMsg.className = 'mt-2 small text-success';
+                            slackStatus.textContent = `✓ Linked to ${data.slack_channel}`;
+                            slackStatus.className = 'mb-2 small text-success';
+                        } else {
+                            slackMsg.textContent = '✗ ' + (data.detail || 'Error');
+                            slackMsg.className = 'mt-2 small text-danger';
+                        }
+                    } catch(e) { slackMsg.textContent = '✗ Network error'; slackMsg.className = 'mt-2 small text-danger'; }
+                    btnSlack.disabled = false; btnSlack.textContent = 'Add to Slack';
+                };
+
+                new bootstrap.Modal(document.getElementById('userIntegrationsModal')).show();
+            },
+
             // Helper: Color code the Type badge
             getTypeBadgeColor(type) {
                 switch(type) {
@@ -349,5 +497,20 @@
     }
 </script>
 
+<script>
+    async function removeFromMbGroup(userId, groupId, mbUserId, btn) {
+        if (!confirm('Remove user from this Metabase group?')) return;
+        btn.disabled = true;
+        try {
+            const r = await fetch(`/metabase/user/${userId}/group/${groupId}`, { method: 'DELETE' });
+            if (r.ok) {
+                btn.closest('span').remove();
+            } else {
+                alert('Failed to remove from group');
+                btn.disabled = false;
+            }
+        } catch(e) { alert('Network error'); btn.disabled = false; }
+    }
+</script>
 </body>
 </html>

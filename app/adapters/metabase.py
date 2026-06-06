@@ -165,6 +165,48 @@ def _get_user_memberships_sync(mb_user_id: int) -> list:
     return result
 
 
+def _get_group_by_name_sync(name: str) -> Optional[dict]:
+    """
+    Return the Metabase group dict if a group with that exact name already exists,
+    or None if it doesn't. Case-insensitive comparison.
+    """
+    _check_config()
+    resp = httpx.get(
+        f"{_base()}/api/permissions/group",
+        headers=_headers(),
+        timeout=_TIMEOUT,
+    )
+    resp.raise_for_status()
+    normalized = name.strip().lower()
+    for g in resp.json():
+        if g.get("name", "").strip().lower() == normalized:
+            return {"id": g["id"], "name": g["name"]}
+    return None
+
+
+def _create_group_sync(name: str) -> dict:
+    """
+    Create a new Metabase permission group.
+    Returns: {id, name}
+    Raises RuntimeError if a group with that name already exists.
+    """
+    _check_config()
+    existing = _get_group_by_name_sync(name)
+    if existing:
+        raise RuntimeError(
+            f"DUPLICATE_GROUP:{existing['id']}:{existing['name']}"
+        )
+    resp = httpx.post(
+        f"{_base()}/api/permissions/group",
+        json={"name": name},
+        headers=_headers(),
+        timeout=_TIMEOUT,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    return {"id": data["id"], "name": data["name"]}
+
+
 def _provision_user_sync(email: str, firstname: str, lastname: str, group_id: int) -> dict:
     """
     Ensure the user exists in Metabase and is a member of the given permission group.
@@ -197,6 +239,19 @@ def _provision_user_sync(email: str, firstname: str, lastname: str, group_id: in
 
 async def list_groups() -> list:
     return await asyncio.to_thread(_list_groups_sync)
+
+
+async def get_group_by_name(name: str) -> Optional[dict]:
+    """Return the Metabase group matching the given name, or None."""
+    return await asyncio.to_thread(_get_group_by_name_sync, name)
+
+
+async def create_group(name: str) -> dict:
+    """
+    Create a new Metabase permission group.
+    Raises RuntimeError with prefix 'DUPLICATE_GROUP:<id>:<name>' if one already exists.
+    """
+    return await asyncio.to_thread(_create_group_sync, name)
 
 
 async def provision_user(email: str, firstname: str, lastname: str, group_id: int) -> dict:

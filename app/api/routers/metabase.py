@@ -56,6 +56,20 @@ async def list_metabase_groups():
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Metabase error: {str(e)}")
 
 
+@router.get("/organization/{org_id}/group")
+async def get_metabase_group_for_org(org_id: UUID, session: SessionDep):
+    """Get the Metabase permission group configured for an organization."""
+    result = await session.execute(
+        select(OrganizationMetabaseGroup).where(
+            OrganizationMetabaseGroup.organization_id == org_id
+        )
+    )
+    group = result.scalars().first()
+    if group is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No Metabase group configured for this organization")
+    return {"external_id": group.external_id, "name": group.name, "id": str(group.id)}
+
+
 @router.put("/organization/{org_id}/group")
 async def assign_metabase_group_to_org(
     org_id: UUID,
