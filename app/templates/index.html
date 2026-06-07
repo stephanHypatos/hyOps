@@ -83,6 +83,19 @@
                             <label for="name" class="form-label">Name</label>
                             <input type="text" class="form-control" id="name" x-model="form.name" required>
                         </div>
+                        <!-- Key — shown only in edit mode; auto-generated on create -->
+                        <div class="col-md-2" x-show="isEditing">
+                            <label for="orgKey" class="form-label">
+                                Key
+                                <span class="text-muted small">(2–7 letters)</span>
+                            </label>
+                            <input type="text" class="form-control font-monospace text-uppercase"
+                                   id="orgKey"
+                                   maxlength="7"
+                                   placeholder="e.g. ACM"
+                                   x-model="form.key"
+                                   @input="form.key = form.key.toUpperCase().replace(/[^A-Z]/g, '')">
+                        </div>
                         <div class="col-md-4">
                             <label for="type" class="form-label">Type</label>
                             <select class="form-select" id="type" x-model="form.type" required>
@@ -95,13 +108,35 @@
                             <label for="email" class="form-label">Email</label>
                             <input type="email" class="form-control" id="email" x-model="form.email" required>
                         </div>
+                        <!-- Industry -->
                         <div class="col-md-4">
-                            <label for="industry" class="form-label">Industry</label>
-                            <input type="text" class="form-control" id="industry" x-model="form.industry" required>
+                            <label for="industrySelect" class="form-label">Industry</label>
+                            <select class="form-select" id="industrySelect"
+                                    x-model="form.industrySelect" required>
+                                <option value="">— Select industry —</option>
+                                <template x-for="ind in industries" :key="ind">
+                                    <option :value="ind" x-text="ind"></option>
+                                </template>
+                            </select>
+                            <!-- Free-text input shown only when "Other" is chosen -->
+                            <input type="text" class="form-control mt-2"
+                                   x-show="form.industrySelect === 'Other'"
+                                   x-model="form.industryOther"
+                                   placeholder="Please specify your industry"
+                                   :required="form.industrySelect === 'Other'">
                         </div>
+
+                        <!-- Country -->
                         <div class="col-md-4">
-                            <label for="country" class="form-label">Country</label>
-                            <input type="text" class="form-control" id="country" x-model="form.country" required>
+                            <label for="countrySelect" class="form-label">Country</label>
+                            <select class="form-select" id="countrySelect"
+                                    x-model="form.country" required>
+                                <option value="">— Select country —</option>
+                                <template x-for="c in countries" :key="c.code">
+                                    <option :value="c.code + ' - ' + c.name"
+                                            x-text="c.code + ' - ' + c.name"></option>
+                                </template>
+                            </select>
                         </div>
                         <div class="col-md-4">
                             <label for="regions_operation" class="form-label">Regions of Operation</label>
@@ -152,6 +187,7 @@
                         <thead class="table-light">
                             <tr>
                                 <th>Name</th>
+                                <th>Key</th>
                                 <th>Type</th>
                                 <th>Email</th>
                                 <th>Industry</th>
@@ -165,15 +201,51 @@
                         </thead>
                         <tbody>
                             <tr x-show="loading">
-                                <td colspan="10" class="text-center text-muted py-4">Loading organizations...</td>
+                                <td colspan="11" class="text-center text-muted py-4">Loading organizations...</td>
                             </tr>
                             <tr x-show="!loading && organizations.length === 0">
-                                <td colspan="10" class="text-center text-muted py-4">No organizations found.</td>
+                                <td colspan="11" class="text-center text-muted py-4">No organizations found.</td>
                             </tr>
                             
                             <template x-for="org in organizations" :key="org.id">
                                 <tr>
                                     <td class="fw-semibold" x-text="org.name"></td>
+
+                                    <!-- Key — inline editable -->
+                                    <td style="min-width:110px;">
+                                        <!-- Display mode -->
+                                        <template x-if="!org._editKey">
+                                            <span class="badge bg-secondary font-monospace"
+                                                  style="cursor:pointer; letter-spacing:.05em;"
+                                                  title="Click to edit key"
+                                                  @click="startEditKey(org)"
+                                                  x-text="org.key || '—'">
+                                            </span>
+                                        </template>
+                                        <!-- Edit mode -->
+                                        <template x-if="org._editKey">
+                                            <div>
+                                                <div class="d-flex gap-1 align-items-center">
+                                                    <input type="text"
+                                                           class="form-control form-control-sm font-monospace text-uppercase"
+                                                           style="width:80px;"
+                                                           maxlength="7"
+                                                           x-model="org._keyInput"
+                                                           @input="org._keyInput = org._keyInput.toUpperCase().replace(/[^A-Z]/g, '')"
+                                                           @keydown.enter="saveKey(org)"
+                                                           @keydown.escape="org._editKey = false; org._keyErr = ''"
+                                                           x-effect="if(org._editKey) $el.focus()">
+                                                    <button class="btn btn-sm btn-primary px-1"
+                                                            :disabled="org._keySaving || !org._keyInput"
+                                                            @click="saveKey(org)">✓</button>
+                                                    <button class="btn btn-sm btn-outline-secondary px-1"
+                                                            @click="org._editKey = false; org._keyErr = ''">✗</button>
+                                                </div>
+                                                <div x-show="org._keyErr" class="small text-danger mt-1" x-text="org._keyErr"></div>
+                                            </div>
+                                        </template>
+                                    </td>
+
                                     <td>
                                         <span class="badge text-capitalize" :class="'bg-' + getTypeBadgeColor(org.type)" x-text="org.type"></span>
                                     </td>
@@ -232,13 +304,129 @@
                 name: '',
                 type: 'customer',
                 email: '',
-                industry: '',
+                industry: '',        // the actual stored value (derived on submit)
+                industrySelect: '',  // which option is selected
+                industryOther: '',   // free text when "Other" is chosen
                 country: '',
                 regions_operation: '',
                 number_subsidiaries: '',
                 company_overview: '',
-                selectedLanguages: [] // Array to bind to checkboxes
+                selectedLanguages: [],
+                key: '',
             },
+
+            // ── Static reference data ─────────────────────────────────────────
+            industries: [
+                'Aerospace & Defense',
+                'Agriculture & Farming',
+                'Automotive',
+                'Banking & Financial Services',
+                'Biotechnology & Pharmaceuticals',
+                'Chemicals',
+                'Construction & Real Estate',
+                'Consumer Goods & Retail',
+                'Education & Research',
+                'Energy & Utilities',
+                'Entertainment & Media',
+                'Food & Beverage',
+                'Government & Public Sector',
+                'Healthcare & Medical',
+                'Hospitality & Tourism',
+                'Insurance',
+                'Legal Services',
+                'Logistics & Transportation',
+                'Manufacturing',
+                'Mining & Resources',
+                'Professional Services',
+                'Technology & Software',
+                'Telecommunications',
+                'Textile & Apparel',
+                'Other',
+            ],
+
+            countries: [
+                {code:'AD',name:'Andorra'},{code:'AE',name:'United Arab Emirates'},{code:'AF',name:'Afghanistan'},
+                {code:'AG',name:'Antigua and Barbuda'},{code:'AI',name:'Anguilla'},{code:'AL',name:'Albania'},
+                {code:'AM',name:'Armenia'},{code:'AO',name:'Angola'},{code:'AR',name:'Argentina'},
+                {code:'AS',name:'American Samoa'},{code:'AT',name:'Austria'},{code:'AU',name:'Australia'},
+                {code:'AW',name:'Aruba'},{code:'AZ',name:'Azerbaijan'},
+                {code:'BA',name:'Bosnia and Herzegovina'},{code:'BB',name:'Barbados'},{code:'BD',name:'Bangladesh'},
+                {code:'BE',name:'Belgium'},{code:'BF',name:'Burkina Faso'},{code:'BG',name:'Bulgaria'},
+                {code:'BH',name:'Bahrain'},{code:'BI',name:'Burundi'},{code:'BJ',name:'Benin'},
+                {code:'BM',name:'Bermuda'},{code:'BN',name:'Brunei'},{code:'BO',name:'Bolivia'},
+                {code:'BR',name:'Brazil'},{code:'BS',name:'Bahamas'},{code:'BT',name:'Bhutan'},
+                {code:'BW',name:'Botswana'},{code:'BY',name:'Belarus'},{code:'BZ',name:'Belize'},
+                {code:'CA',name:'Canada'},{code:'CD',name:'DR Congo'},{code:'CF',name:'Central African Republic'},
+                {code:'CG',name:'Republic of the Congo'},{code:'CH',name:'Switzerland'},
+                {code:'CI',name:"Côte d'Ivoire"},{code:'CK',name:'Cook Islands'},{code:'CL',name:'Chile'},
+                {code:'CM',name:'Cameroon'},{code:'CN',name:'China'},{code:'CO',name:'Colombia'},
+                {code:'CR',name:'Costa Rica'},{code:'CU',name:'Cuba'},{code:'CV',name:'Cape Verde'},
+                {code:'CW',name:'Curaçao'},{code:'CY',name:'Cyprus'},{code:'CZ',name:'Czech Republic'},
+                {code:'DE',name:'Germany'},{code:'DJ',name:'Djibouti'},{code:'DK',name:'Denmark'},
+                {code:'DM',name:'Dominica'},{code:'DO',name:'Dominican Republic'},{code:'DZ',name:'Algeria'},
+                {code:'EC',name:'Ecuador'},{code:'EE',name:'Estonia'},{code:'EG',name:'Egypt'},
+                {code:'ER',name:'Eritrea'},{code:'ES',name:'Spain'},{code:'ET',name:'Ethiopia'},
+                {code:'FI',name:'Finland'},{code:'FJ',name:'Fiji'},{code:'FK',name:'Falkland Islands'},
+                {code:'FM',name:'Micronesia'},{code:'FO',name:'Faroe Islands'},{code:'FR',name:'France'},
+                {code:'GA',name:'Gabon'},{code:'GB',name:'United Kingdom'},{code:'GD',name:'Grenada'},
+                {code:'GE',name:'Georgia'},{code:'GH',name:'Ghana'},{code:'GI',name:'Gibraltar'},
+                {code:'GL',name:'Greenland'},{code:'GM',name:'Gambia'},{code:'GN',name:'Guinea'},
+                {code:'GQ',name:'Equatorial Guinea'},{code:'GR',name:'Greece'},{code:'GT',name:'Guatemala'},
+                {code:'GU',name:'Guam'},{code:'GW',name:'Guinea-Bissau'},{code:'GY',name:'Guyana'},
+                {code:'HK',name:'Hong Kong'},{code:'HN',name:'Honduras'},{code:'HR',name:'Croatia'},
+                {code:'HT',name:'Haiti'},{code:'HU',name:'Hungary'},
+                {code:'ID',name:'Indonesia'},{code:'IE',name:'Ireland'},{code:'IL',name:'Israel'},
+                {code:'IM',name:'Isle of Man'},{code:'IN',name:'India'},{code:'IQ',name:'Iraq'},
+                {code:'IR',name:'Iran'},{code:'IS',name:'Iceland'},{code:'IT',name:'Italy'},
+                {code:'JM',name:'Jamaica'},{code:'JO',name:'Jordan'},{code:'JP',name:'Japan'},
+                {code:'KE',name:'Kenya'},{code:'KG',name:'Kyrgyzstan'},{code:'KH',name:'Cambodia'},
+                {code:'KI',name:'Kiribati'},{code:'KM',name:'Comoros'},{code:'KN',name:'Saint Kitts and Nevis'},
+                {code:'KP',name:'North Korea'},{code:'KR',name:'South Korea'},{code:'KW',name:'Kuwait'},
+                {code:'KY',name:'Cayman Islands'},{code:'KZ',name:'Kazakhstan'},
+                {code:'LA',name:'Laos'},{code:'LB',name:'Lebanon'},{code:'LC',name:'Saint Lucia'},
+                {code:'LI',name:'Liechtenstein'},{code:'LK',name:'Sri Lanka'},{code:'LR',name:'Liberia'},
+                {code:'LS',name:'Lesotho'},{code:'LT',name:'Lithuania'},{code:'LU',name:'Luxembourg'},
+                {code:'LV',name:'Latvia'},{code:'LY',name:'Libya'},
+                {code:'MA',name:'Morocco'},{code:'MC',name:'Monaco'},{code:'MD',name:'Moldova'},
+                {code:'ME',name:'Montenegro'},{code:'MG',name:'Madagascar'},{code:'MH',name:'Marshall Islands'},
+                {code:'MK',name:'North Macedonia'},{code:'ML',name:'Mali'},{code:'MM',name:'Myanmar'},
+                {code:'MN',name:'Mongolia'},{code:'MO',name:'Macao'},{code:'MQ',name:'Martinique'},
+                {code:'MR',name:'Mauritania'},{code:'MT',name:'Malta'},{code:'MU',name:'Mauritius'},
+                {code:'MV',name:'Maldives'},{code:'MW',name:'Malawi'},{code:'MX',name:'Mexico'},
+                {code:'MY',name:'Malaysia'},{code:'MZ',name:'Mozambique'},
+                {code:'NA',name:'Namibia'},{code:'NC',name:'New Caledonia'},{code:'NE',name:'Niger'},
+                {code:'NG',name:'Nigeria'},{code:'NI',name:'Nicaragua'},{code:'NL',name:'Netherlands'},
+                {code:'NO',name:'Norway'},{code:'NP',name:'Nepal'},{code:'NR',name:'Nauru'},
+                {code:'NZ',name:'New Zealand'},
+                {code:'OM',name:'Oman'},
+                {code:'PA',name:'Panama'},{code:'PE',name:'Peru'},{code:'PF',name:'French Polynesia'},
+                {code:'PG',name:'Papua New Guinea'},{code:'PH',name:'Philippines'},{code:'PK',name:'Pakistan'},
+                {code:'PL',name:'Poland'},{code:'PR',name:'Puerto Rico'},{code:'PS',name:'Palestine'},
+                {code:'PT',name:'Portugal'},{code:'PW',name:'Palau'},{code:'PY',name:'Paraguay'},
+                {code:'QA',name:'Qatar'},
+                {code:'RO',name:'Romania'},{code:'RS',name:'Serbia'},{code:'RU',name:'Russia'},
+                {code:'RW',name:'Rwanda'},
+                {code:'SA',name:'Saudi Arabia'},{code:'SB',name:'Solomon Islands'},{code:'SC',name:'Seychelles'},
+                {code:'SD',name:'Sudan'},{code:'SE',name:'Sweden'},{code:'SG',name:'Singapore'},
+                {code:'SH',name:'Saint Helena'},{code:'SI',name:'Slovenia'},{code:'SK',name:'Slovakia'},
+                {code:'SL',name:'Sierra Leone'},{code:'SM',name:'San Marino'},{code:'SN',name:'Senegal'},
+                {code:'SO',name:'Somalia'},{code:'SR',name:'Suriname'},{code:'SS',name:'South Sudan'},
+                {code:'ST',name:'São Tomé and Príncipe'},{code:'SV',name:'El Salvador'},
+                {code:'SX',name:'Sint Maarten'},{code:'SY',name:'Syria'},{code:'SZ',name:'Eswatini'},
+                {code:'TC',name:'Turks and Caicos Islands'},{code:'TD',name:'Chad'},{code:'TG',name:'Togo'},
+                {code:'TH',name:'Thailand'},{code:'TJ',name:'Tajikistan'},{code:'TL',name:'Timor-Leste'},
+                {code:'TM',name:'Turkmenistan'},{code:'TN',name:'Tunisia'},{code:'TO',name:'Tonga'},
+                {code:'TR',name:'Turkey'},{code:'TT',name:'Trinidad and Tobago'},{code:'TV',name:'Tuvalu'},
+                {code:'TW',name:'Taiwan'},{code:'TZ',name:'Tanzania'},
+                {code:'UA',name:'Ukraine'},{code:'UG',name:'Uganda'},{code:'US',name:'United States'},
+                {code:'UY',name:'Uruguay'},{code:'UZ',name:'Uzbekistan'},
+                {code:'VA',name:'Vatican City'},{code:'VC',name:'Saint Vincent and the Grenadines'},
+                {code:'VE',name:'Venezuela'},{code:'VG',name:'British Virgin Islands'},
+                {code:'VI',name:'US Virgin Islands'},{code:'VN',name:'Vietnam'},{code:'VU',name:'Vanuatu'},
+                {code:'WS',name:'Samoa'},
+                {code:'YE',name:'Yemen'},{code:'YT',name:'Mayotte'},
+                {code:'ZA',name:'South Africa'},{code:'ZM',name:'Zambia'},{code:'ZW',name:'Zimbabwe'},
+            ],
 
             // API Base URLs
             orgApiBase: "/organization",
@@ -267,7 +455,15 @@
                 try {
                     const response = await fetch(`${this.orgApiBase}/organizations`);
                     if (!response.ok) throw new Error("Failed to fetch");
-                    this.organizations = await response.json();
+                    const raw = await response.json();
+                    // Augment each org with inline-edit state for the Key column
+                    this.organizations = raw.map(o => ({
+                        ...o,
+                        _editKey:   false,
+                        _keyInput:  o.key || '',
+                        _keyErr:    '',
+                        _keySaving: false,
+                    }));
                 } catch (error) {
                     console.error(error);
                     alert("Error fetching organizations. Is the API running?");
@@ -278,11 +474,24 @@
 
             // Handle Create or Update
             async submitForm() {
+                // Validate "Other" industry free text
+                if (this.form.industrySelect === 'Other' && !this.form.industryOther.trim()) {
+                    alert('Please specify your industry in the text field.');
+                    return;
+                }
+
                 let payload = JSON.parse(JSON.stringify(this.form));
 
                 // FIX: Strip server-managed fields to prevent asyncpg string-to-timestamp error
                 delete payload.created_at;
                 delete payload.updated_at;
+
+                // Derive the actual industry value and remove UI-only fields
+                payload.industry = payload.industrySelect === 'Other'
+                    ? payload.industryOther.trim()
+                    : payload.industrySelect;
+                delete payload.industrySelect;
+                delete payload.industryOther;
 
                 // Convert selectedLanguages array to comma-separated string for DB
                 payload.languages = payload.selectedLanguages.join(',');
@@ -334,14 +543,32 @@
                 this.form = JSON.parse(JSON.stringify(org));
 
                 // Convert comma-separated string from DB back to array for checkboxes
-                this.form.selectedLanguages = this.form.languages 
-                    ? this.form.languages.split(',').map(l => l.trim()) 
+                this.form.selectedLanguages = this.form.languages
+                    ? this.form.languages.split(',').map(l => l.trim())
                     : [];
 
                 // Ensure all form keys exist
-                this.form.regions_operation = this.form.regions_operation || '';
+                this.form.regions_operation   = this.form.regions_operation   || '';
                 this.form.number_subsidiaries = this.form.number_subsidiaries || '';
-                this.form.company_overview = this.form.company_overview || '';
+                this.form.company_overview    = this.form.company_overview    || '';
+                this.form.key                 = this.form.key                 || '';
+
+                // Industry: match against predefined list or fall back to "Other"
+                const stored = org.industry || '';
+                if (!stored) {
+                    this.form.industrySelect = '';
+                    this.form.industryOther  = '';
+                } else if (this.industries.includes(stored)) {
+                    this.form.industrySelect = stored;
+                    this.form.industryOther  = '';
+                } else {
+                    this.form.industrySelect = 'Other';
+                    this.form.industryOther  = stored;
+                }
+
+                // Country is already stored in "XX - Name" format;
+                // the select will match automatically.
+                this.form.country = org.country || '';
             },
 
             // Delete organization
@@ -361,6 +588,53 @@
                 }
             },
 
+            // ── Inline key edit ───────────────────────────────────────────────
+
+            startEditKey(org) {
+                org._keyInput = org.key || '';
+                org._keyErr   = '';
+                org._editKey  = true;
+            },
+
+            async saveKey(org) {
+                const key = (org._keyInput || '').trim().toUpperCase().replace(/[^A-Z]/g, '');
+
+                // Client-side validation
+                if (!key) {
+                    org._keyErr = 'Key is required';
+                    return;
+                }
+                if (key.length < 2 || key.length > 7) {
+                    org._keyErr = 'Key must be 2–7 letters';
+                    return;
+                }
+
+                org._keySaving = true;
+                org._keyErr    = '';
+                try {
+                    const r = await fetch(`${this.orgApiBase}/?id=${org.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ key }),
+                    });
+                    const data = await r.json();
+                    if (r.ok) {
+                        org.key      = data.key;
+                        org._editKey = false;
+                    } else {
+                        // 409 conflict, 422 validation, etc.
+                        const detail = data.detail;
+                        org._keyErr = typeof detail === 'string'
+                            ? detail
+                            : (detail?.msg || JSON.stringify(detail) || 'Error saving key');
+                    }
+                } catch(e) {
+                    org._keyErr = 'Network error';
+                } finally {
+                    org._keySaving = false;
+                }
+            },
+
             // Reset form state
             resetForm() {
                 this.isEditing = false;
@@ -370,11 +644,14 @@
                     type: 'customer',
                     email: '',
                     industry: '',
+                    industrySelect: '',
+                    industryOther: '',
                     country: '',
                     regions_operation: '',
                     number_subsidiaries: '',
                     company_overview: '',
-                    selectedLanguages: []
+                    selectedLanguages: [],
+                    key: '',
                 };
             },
 

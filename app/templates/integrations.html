@@ -57,6 +57,7 @@
                                 <th>Metabase Group</th>
                                 <th>Teams Group</th>
                                 <th>Slack Channel</th>
+                                <th>Jira</th>
                                 <th style="width:100px;">Actions</th>
                             </tr>
                         </thead>
@@ -110,13 +111,30 @@
 
                                     <!-- Slack -->
                                     <td>
-                                        <template x-if="org._slack">
+                                        <template x-if="org._slack && org._slack.length > 0">
                                             <span class="integration-badge badge-configured">
                                                 <span class="status-dot dot-green"></span>
-                                                <span x-text="org._slack.channel_name"></span>
+                                                <span x-text="org._slack.length + ' channel' + (org._slack.length > 1 ? 's' : '')"></span>
                                             </span>
                                         </template>
-                                        <template x-if="!org._slack">
+                                        <template x-if="!org._slack || org._slack.length === 0">
+                                            <span class="integration-badge badge-not-configured">
+                                                <span class="status-dot dot-gray"></span>
+                                                Not configured
+                                            </span>
+                                        </template>
+                                    </td>
+
+                                    <!-- Jira -->
+                                    <td>
+                                        <template x-if="org._jira">
+                                            <a :href="org._jira.board_url" target="_blank" rel="noopener"
+                                               class="integration-badge badge-configured text-decoration-none">
+                                                <span class="status-dot dot-green"></span>
+                                                <span x-text="org._jira.project_key"></span>
+                                            </a>
+                                        </template>
+                                        <template x-if="!org._jira">
                                             <span class="integration-badge badge-not-configured">
                                                 <span class="status-dot dot-gray"></span>
                                                 Not configured
@@ -229,6 +247,92 @@
                     <div x-show="admin.actionMsg" class="mt-3 small"
                          :class="admin.actionOk ? 'text-success' : 'text-danger'"
                          x-text="admin.actionMsg"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Jira Settings ────────────────────────────────────────────────── -->
+        <div class="card shadow-sm mt-3">
+            <div class="card-header bg-white">
+                <button class="btn btn-link text-decoration-none p-0 fw-semibold text-dark"
+                        data-bs-toggle="collapse" data-bs-target="#jiraAdminPanel">
+                    🟦 Jira Settings — Lead Users
+                    <span class="text-muted small ms-2">(manage who can be set as project lead)</span>
+                </button>
+            </div>
+            <div class="collapse" id="jiraAdminPanel">
+                <div class="card-body">
+                    <!-- Load button -->
+                    <div class="mb-3">
+                        <button class="btn btn-sm btn-outline-secondary"
+                                :disabled="jiraAdmin.loading"
+                                @click="loadJiraLeadUsersAdmin()">
+                            <span x-show="!jiraAdmin.loading">🔍 Load lead users</span>
+                            <span x-show="jiraAdmin.loading">Loading…</span>
+                        </button>
+                    </div>
+
+                    <!-- Table -->
+                    <div x-show="jiraAdmin.loaded">
+                        <div x-show="jiraAdmin.users.length === 0" class="text-muted small mb-3">No lead users configured.</div>
+                        <div x-show="jiraAdmin.users.length > 0" class="table-responsive mb-3" style="max-height:280px;overflow-y:auto;">
+                            <table class="table table-sm table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Username</th>
+                                        <th>Jira Account ID</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="u in jiraAdmin.users" :key="u.id">
+                                        <tr>
+                                            <td x-text="u.username" class="fw-semibold"></td>
+                                            <td><code x-text="u.jira_account_id" class="small text-muted"></code></td>
+                                            <td class="text-end">
+                                                <button class="btn btn-sm btn-outline-danger"
+                                                        :disabled="jiraAdmin.saving"
+                                                        @click="deleteJiraLeadUser(u.id)">
+                                                    Remove
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Add new user form -->
+                        <hr class="my-2">
+                        <p class="small fw-semibold mb-2">Add a lead user</p>
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label form-label-sm mb-1 small">Username <span class="text-muted">(e.g. jane.doe)</span></label>
+                                <input type="text" class="form-control form-control-sm"
+                                       placeholder="jane.doe"
+                                       x-model="jiraAdmin.newUsername">
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label form-label-sm mb-1 small">Jira Account ID</label>
+                                <input type="text" class="form-control form-control-sm"
+                                       placeholder="712020:abc…"
+                                       x-model="jiraAdmin.newAccountId">
+                            </div>
+                            <div class="col-md-3">
+                                <button class="btn btn-sm btn-primary w-100"
+                                        :disabled="jiraAdmin.saving || !jiraAdmin.newUsername || !jiraAdmin.newAccountId"
+                                        @click="addJiraLeadUser()">
+                                    <span x-show="!jiraAdmin.saving">+ Add</span>
+                                    <span x-show="jiraAdmin.saving">Adding…</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div x-show="jiraAdmin.error" class="mt-2 small text-danger" x-text="jiraAdmin.error"></div>
+                    <div x-show="jiraAdmin.msg" class="mt-2 small"
+                         :class="jiraAdmin.ok ? 'text-success' : 'text-danger'"
+                         x-text="jiraAdmin.msg"></div>
                 </div>
             </div>
         </div>
@@ -427,34 +531,275 @@
                     <div x-show="$store.modal.teamsMembersLoaded && $store.modal.teamsMembers.length === 0" class="mt-2 small text-muted">
                         No members found in this team.
                     </div>
+
+                    <!-- SharePoint: copy template -->
+                    <template x-if="$store.modal.teams.external_id">
+                        <div class="mt-3 p-2 bg-light rounded">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <p class="mb-0 small fw-semibold">📁 SharePoint</p>
+                                <!-- Persistent status badge -->
+                                <template x-if="$store.modal.spCopiedAt">
+                                    <span class="badge bg-success">
+                                        ✓ Copied
+                                        <span x-text="new Date($store.modal.spCopiedAt).toLocaleDateString()"></span>
+                                    </span>
+                                </template>
+                                <template x-if="!$store.modal.spCopiedAt">
+                                    <span class="badge bg-secondary">Not copied yet</span>
+                                </template>
+                            </div>
+                            <p class="mb-2 small text-muted">
+                                Copy the <strong>Project</strong> template folder (and all subfolders) from
+                                <em>CSTemplates</em> into this org's Teams SharePoint.
+                            </p>
+                            <button class="btn btn-sm btn-outline-secondary"
+                                    :disabled="$store.modal.saving"
+                                    @click="$store.modal.copySharePoint()">
+                                <span x-show="!$store.modal.saving">📋 Copy template SharePoint folder to Teams</span>
+                                <span x-show="$store.modal.saving">Copying…</span>
+                            </button>
+                            <div x-show="$store.modal.spMsg" class="mt-2 small"
+                                 :class="$store.modal.spOk ? 'text-success' : 'text-danger'"
+                                 x-text="$store.modal.spMsg"></div>
+                            <div x-show="$store.modal.spSiteUrl" class="mt-1 small">
+                                <a :href="$store.modal.spSiteUrl" target="_blank" rel="noopener">
+                                    Open org SharePoint ↗
+                                </a>
+                            </div>
+                        </div>
+                    </template>
                 </div>
 
                 <!-- Slack -->
                 <div class="p-3 border rounded">
                     <h6 class="fw-bold mb-3">💬 Slack</h6>
-                    <div class="row g-3">
-                        <div class="col-md-5">
-                            <label class="form-label">Channel ID <small class="text-muted">(e.g. C01234ABCDE)</small></label>
-                            <input type="text" class="form-control" placeholder="e.g. C01234ABCDE"
-                                   x-model="$store.modal.slack.external_id">
+                    <div class="row g-3 mb-3">
+
+                        <!-- Client Channel -->
+                        <div class="col-md-6">
+                            <div class="card h-100" :class="$store.modal.slackChannels.client ? 'border-success' : 'border-secondary'">
+                                <div class="card-header d-flex justify-content-between align-items-center py-2">
+                                    <strong class="small">client-…</strong>
+                                    <span class="badge" :class="$store.modal.slackChannels.client ? 'bg-success' : 'bg-secondary'"
+                                          x-text="$store.modal.slackChannels.client ? 'Configured' : 'Not configured'"></span>
+                                </div>
+                                <div class="card-body py-2 px-3">
+                                    <p class="small text-muted mb-2">For users of type <strong>internal</strong></p>
+                                    <template x-if="$store.modal.slackChannels.client">
+                                        <div>
+                                            <div class="small mb-2">
+                                                <span class="text-success fw-semibold" x-text="$store.modal.slackChannels.client.channel_name"></span>
+                                                <code class="ms-1 text-muted" style="font-size:0.75em;" x-text="$store.modal.slackChannels.client.external_id"></code>
+                                            </div>
+                                            <div class="d-flex gap-2 flex-wrap">
+                                                <button class="btn btn-sm btn-outline-primary"
+                                                        :disabled="$store.modal.slackLoadingMembers"
+                                                        @click="$store.modal.loadSlackMembers('client')">
+                                                    👥 Members
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger"
+                                                        :disabled="$store.modal.saving"
+                                                        @click="$store.modal.unlinkSlack('client')">
+                                                    Unlink
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <template x-if="!$store.modal.slackChannels.client">
+                                        <button class="btn btn-sm btn-primary"
+                                                :disabled="$store.modal.saving"
+                                                @click="$store.modal.createSlackChannel('client')">
+                                            <span x-show="!$store.modal.saving">＋ Create client channel</span>
+                                            <span x-show="$store.modal.saving">Creating…</span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-5">
-                            <label class="form-label">Channel Name</label>
-                            <input type="text" class="form-control" placeholder="e.g. ext-acme"
-                                   x-model="$store.modal.slack.channel_name">
-                        </div>
-                        <div class="col-md-2 d-flex align-items-end">
-                            <button class="btn btn-primary w-100"
-                                    :disabled="$store.modal.saving"
-                                    @click="$store.modal.saveSlack()">
-                                <span x-show="!$store.modal.saving">Save</span>
-                                <span x-show="$store.modal.saving">…</span>
-                            </button>
+
+                        <!-- Partner Channel -->
+                        <div class="col-md-6">
+                            <div class="card h-100" :class="$store.modal.slackChannels.ext_partner ? 'border-success' : 'border-secondary'">
+                                <div class="card-header d-flex justify-content-between align-items-center py-2">
+                                    <strong class="small">ext-partner-…</strong>
+                                    <span class="badge" :class="$store.modal.slackChannels.ext_partner ? 'bg-success' : 'bg-secondary'"
+                                          x-text="$store.modal.slackChannels.ext_partner ? 'Configured' : 'Not configured'"></span>
+                                </div>
+                                <div class="card-body py-2 px-3">
+                                    <p class="small text-muted mb-2">For users of type <strong>internal</strong> + <strong>partner</strong></p>
+                                    <template x-if="$store.modal.slackChannels.ext_partner">
+                                        <div>
+                                            <div class="small mb-2">
+                                                <span class="text-success fw-semibold" x-text="$store.modal.slackChannels.ext_partner.channel_name"></span>
+                                                <code class="ms-1 text-muted" style="font-size:0.75em;" x-text="$store.modal.slackChannels.ext_partner.external_id"></code>
+                                            </div>
+                                            <div class="d-flex gap-2 flex-wrap">
+                                                <button class="btn btn-sm btn-outline-primary"
+                                                        :disabled="$store.modal.slackLoadingMembers"
+                                                        @click="$store.modal.loadSlackMembers('ext_partner')">
+                                                    👥 Members
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger"
+                                                        :disabled="$store.modal.saving"
+                                                        @click="$store.modal.unlinkSlack('ext_partner')">
+                                                    Unlink
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <template x-if="!$store.modal.slackChannels.ext_partner">
+                                        <button class="btn btn-sm btn-primary"
+                                                :disabled="$store.modal.saving"
+                                                @click="$store.modal.createSlackChannel('ext_partner')">
+                                            <span x-show="!$store.modal.saving">＋ Create partner channel</span>
+                                            <span x-show="$store.modal.saving">Creating…</span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
                         </div>
                     </div>
+
+                    <!-- Members panel -->
+                    <div x-show="$store.modal.slackMembersType" class="mt-2">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <strong class="small">Members of
+                                <span x-text="$store.modal.slackMembersChannelName()"></span>
+                            </strong>
+                            <button class="btn btn-sm btn-outline-secondary py-0"
+                                    @click="$store.modal.slackMembersType = null; $store.modal.slackCurrentMembers = []">
+                                ✕
+                            </button>
+                        </div>
+                        <div x-show="$store.modal.slackLoadingMembers" class="text-muted small">Loading members…</div>
+                        <div x-show="!$store.modal.slackLoadingMembers && $store.modal.slackMembersLoaded && $store.modal.slackCurrentMembers.length === 0"
+                             class="text-muted small">No members found in this channel.</div>
+                        <div x-show="$store.modal.slackCurrentMembers.length > 0" class="table-responsive">
+                            <table class="table table-sm table-bordered mb-0" style="font-size:0.82rem;">
+                                <thead class="table-light">
+                                    <tr><th>Name</th><th>Email</th><th style="width:80px;">Action</th></tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="m in $store.modal.slackCurrentMembers" :key="m.slack_user_id">
+                                        <tr>
+                                            <td x-text="m.name"></td>
+                                            <td x-text="m.email"></td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-danger py-0"
+                                                        :disabled="$store.modal.saving"
+                                                        @click="$store.modal.removeSlackMember(m.slack_user_id)">
+                                                    Remove
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                     <div x-show="$store.modal.slackMsg" class="mt-2 small"
                          :class="$store.modal.slackOk ? 'text-success' : 'text-danger'"
                          x-text="$store.modal.slackMsg"></div>
+                </div>
+
+                <!-- Jira -->
+                <div class="p-3 border rounded">
+                    <h6 class="fw-bold mb-3">🟦 Jira</h6>
+
+                    <!-- Configured state -->
+                    <template x-if="$store.modal.jira.project_key">
+                        <div>
+                            <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+                                <span class="integration-badge badge-configured">
+                                    <span class="status-dot dot-green"></span>
+                                    <strong x-text="$store.modal.jira.project_key"></strong>
+                                    — <span x-text="$store.modal.jira.project_name"></span>
+                                </span>
+                                <a :href="$store.modal.jira.board_url" target="_blank" rel="noopener"
+                                   class="btn btn-sm btn-outline-primary">
+                                    Open Board ↗
+                                </a>
+                                <button class="btn btn-sm btn-outline-danger"
+                                        :disabled="$store.modal.saving"
+                                        @click="$store.modal.unlinkJira()">
+                                    Unlink
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- Not configured state -->
+                    <template x-if="!$store.modal.jira.project_key">
+                        <div>
+                            <!-- Option A: create new -->
+                            <div class="mb-3 p-2 bg-light rounded">
+                                <p class="mb-2 small fw-semibold">Option A — Create a new Jira project for this org</p>
+                                <p class="mb-2 small text-muted">
+                                    Creates a company-managed (Jira Core) project named <em>&lt;org&gt; x Hypatos</em>.
+                                    Assigns standard Hypatos schemes automatically.
+                                </p>
+                                <div class="row g-2 mb-2">
+                                    <!-- Project key -->
+                                    <div class="col-md-4">
+                                        <label class="form-label form-label-sm mb-1 small">Project key <span class="text-muted">(2–7 letters)</span></label>
+                                        <input type="text" class="form-control form-control-sm text-uppercase"
+                                               placeholder="e.g. FNK"
+                                               maxlength="7"
+                                               x-model="$store.modal.jira.input_key"
+                                               @input="$store.modal.jira.input_key = $store.modal.jira.input_key.toUpperCase().replace(/[^A-Z]/g, '')">
+                                    </div>
+                                    <!-- Lead user (dynamic, from DB via $store.modal.jiraLeadUsers) -->
+                                    <div class="col-md-8">
+                                        <label class="form-label form-label-sm mb-1 small">Lead</label>
+                                        <select class="form-select form-select-sm"
+                                                x-model="$store.modal.jira.input_lead_id">
+                                            <option value="" disabled>— select lead —</option>
+                                            <template x-for="u in $store.modal.jiraLeadUsers" :key="u.id">
+                                                <option :value="u.id" x-text="u.username"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                </div>
+                                <button class="btn btn-sm btn-primary"
+                                        :disabled="$store.modal.saving || !$store.modal.jira.input_key"
+                                        @click="$store.modal.createJiraProject()">
+                                    <span x-show="!$store.modal.saving">🚀 Create Jira project</span>
+                                    <span x-show="$store.modal.saving">Creating…</span>
+                                </button>
+                            </div>
+
+                            <!-- Option B: link existing -->
+                            <div class="p-2 bg-light rounded">
+                                <p class="mb-2 small fw-semibold">Option B — Link an existing Jira project</p>
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <input type="text" class="form-control form-control-sm"
+                                               placeholder="Project key (e.g. FNK)"
+                                               x-model="$store.modal.jira.input_key"
+                                               @input="$store.modal.jira.input_key = $store.modal.jira.input_key.toUpperCase()">
+                                    </div>
+                                    <div class="col-md-5">
+                                        <input type="text" class="form-control form-control-sm"
+                                               placeholder="Project name"
+                                               x-model="$store.modal.jira.input_name">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <button class="btn btn-sm btn-outline-primary w-100"
+                                                :disabled="$store.modal.saving"
+                                                @click="$store.modal.saveJira()">
+                                            <span x-show="!$store.modal.saving">Link</span>
+                                            <span x-show="$store.modal.saving">…</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+
+                    <div x-show="$store.modal.jiraMsg" class="mt-2 small"
+                         :class="$store.modal.jiraOk ? 'text-success' : 'text-danger'"
+                         x-text="$store.modal.jiraMsg"></div>
                 </div>
 
             </div>
@@ -483,9 +828,18 @@
             teamsMembers: [],
             teamsLoadingMembers: false,
             teamsMembersLoaded: false,
+            spMsg: '', spOk: true, spSiteUrl: '', spCopiedAt: null,
 
-            slack: { external_id: '', channel_name: '' },
+            slackChannels: { client: null, ext_partner: null },
             slackMsg: '', slackOk: true,
+            slackMembersType: null,
+            slackCurrentMembers: [],
+            slackLoadingMembers: false,
+            slackMembersLoaded: false,
+
+            jira: { project_key: '', project_id: '', project_name: '', board_url: '', input_key: '', input_name: '', input_lead_id: '' },
+            jiraMsg: '', jiraOk: true,
+            jiraLeadUsers: [],   // global list — populated from loadJiraLeadUsers()
 
             // ── Metabase ──────────────────────────────────────────────────────
             async unlinkMetabase() {
@@ -647,20 +1001,222 @@
                 finally { this.saving = false; }
             },
 
+            // ── SharePoint ────────────────────────────────────────────────────
+            async copySharePoint() {
+                this.saving = true;
+                this.spMsg = '⏳ Copying "Project" template folder…';
+                this.spOk = true; this.spSiteUrl = '';
+                try {
+                    const r = await fetch(`/teams/organization/${this.orgId}/copy-sharepoint`, { method: 'POST' });
+                    const data = await r.json();
+                    if (r.ok) {
+                        const s = data.status || '';
+                        if (s === 'completed') {
+                            this.spMsg = `✓ "${data.folder_name}" folder copied successfully`;
+                        } else if (s === 'inProgress') {
+                            this.spMsg = `✓ Copy started — SharePoint is processing in the background`;
+                        } else {
+                            this.spOk = false;
+                            this.spMsg = `⚠ Unexpected status: ${s}`;
+                        }
+                        this.spSiteUrl  = data.org_site_url || '';
+                        this.spCopiedAt = data.sharepoint_copied_at || null;
+                        // Refresh org list so badge persists on next modal open
+                        window.integrationsApp && window.integrationsApp.reload();
+                    } else {
+                        this.spOk = false;
+                        this.spMsg = '✗ ' + (data.detail || 'Error copying SharePoint template');
+                    }
+                } catch(e) { this.spOk = false; this.spMsg = '✗ Network error'; }
+                finally { this.saving = false; }
+            },
+
             // ── Slack ─────────────────────────────────────────────────────────
-            async saveSlack() {
+            slackMembersChannelName() {
+                if (!this.slackMembersType) return '';
+                const ch = this.slackChannels[this.slackMembersType];
+                return ch ? ch.channel_name : this.slackMembersType;
+            },
+
+            async createSlackChannel(channelType) {
                 this.saving = true; this.slackMsg = '';
                 try {
-                    const r = await fetch(`/slack/organization/${this.orgId}/channel`, {
-                        method: 'PUT',
+                    const r = await fetch(`/slack/organization/${this.orgId}/create-channel`, {
+                        method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(this.slack)
+                        body: JSON.stringify({ channel_type: channelType })
                     });
                     const data = await r.json();
-                    this.slackOk = r.ok;
-                    this.slackMsg = r.ok ? '✓ Saved' : (data.detail || 'Error saving');
-                    if (r.ok) window.integrationsApp && window.integrationsApp.reload();
+                    if (r.ok) {
+                        this.slackOk = true;
+                        const inv = (data.users_invited || []).length;
+                        const nf  = (data.users_not_found || []).length;
+                        let msg = `✓ Channel '${data.channel_name}' ${data.already_exists ? 'linked (already existed)' : 'created'}`;
+                        if (inv > 0) msg += ` — ${inv} user(s) invited`;
+                        if (nf  > 0) msg += ` (${nf} not found in Slack)`;
+                        this.slackMsg = msg;
+                        this.slackChannels[channelType] = {
+                            external_id:  data.channel_id,
+                            channel_name: data.channel_name,
+                            channel_type: channelType,
+                        };
+                        window.integrationsApp && window.integrationsApp.reload();
+                    } else if (r.status === 409) {
+                        this.slackOk = false;
+                        this.slackMsg = '✗ ' + (data.detail || 'Channel already configured');
+                    } else {
+                        this.slackOk = false;
+                        this.slackMsg = '✗ ' + (data.detail || 'Error creating channel');
+                    }
                 } catch(e) { this.slackOk = false; this.slackMsg = '✗ Network error'; }
+                finally { this.saving = false; }
+            },
+
+            async unlinkSlack(channelType) {
+                if (!confirm('Unlink this Slack channel from the organization?\n\nThis removes the connection in hyOps but does NOT delete the channel in Slack.')) return;
+                this.saving = true; this.slackMsg = '';
+                try {
+                    const r = await fetch(`/slack/organization/${this.orgId}/channels/${channelType}`, { method: 'DELETE' });
+                    const data = await r.json();
+                    if (r.ok) {
+                        this.slackOk = true;
+                        this.slackMsg = '✓ Channel unlinked';
+                        this.slackChannels[channelType] = null;
+                        if (this.slackMembersType === channelType) {
+                            this.slackMembersType = null;
+                            this.slackCurrentMembers = [];
+                        }
+                        window.integrationsApp && window.integrationsApp.reload();
+                    } else {
+                        this.slackOk = false;
+                        this.slackMsg = '✗ ' + (data.detail || 'Error unlinking');
+                    }
+                } catch(e) { this.slackOk = false; this.slackMsg = '✗ Network error'; }
+                finally { this.saving = false; }
+            },
+
+            async loadSlackMembers(channelType) {
+                this.slackMembersType = channelType;
+                this.slackCurrentMembers = [];
+                this.slackMembersLoaded = false;
+                this.slackLoadingMembers = true;
+                this.slackMsg = '';
+                try {
+                    const r = await fetch(`/slack/organization/${this.orgId}/channels/${channelType}/members`);
+                    if (r.ok) {
+                        const data = await r.json();
+                        this.slackCurrentMembers = data.members || [];
+                        this.slackMembersLoaded = true;
+                    } else {
+                        const data = await r.json();
+                        this.slackOk = false;
+                        this.slackMsg = '✗ ' + (data.detail || 'Could not load members');
+                    }
+                } catch(e) { this.slackOk = false; this.slackMsg = '✗ Network error loading members'; }
+                finally { this.slackLoadingMembers = false; }
+            },
+
+            async removeSlackMember(slackUserId) {
+                if (!confirm('Remove this member from the Slack channel?')) return;
+                this.saving = true; this.slackMsg = '';
+                try {
+                    const r = await fetch(
+                        `/slack/organization/${this.orgId}/channels/${this.slackMembersType}/members/${slackUserId}`,
+                        { method: 'DELETE' }
+                    );
+                    const data = await r.json();
+                    if (r.ok) {
+                        this.slackCurrentMembers = this.slackCurrentMembers.filter(m => m.slack_user_id !== slackUserId);
+                        this.slackOk = true;
+                        this.slackMsg = '✓ Member removed from channel';
+                    } else {
+                        this.slackOk = false;
+                        this.slackMsg = '✗ ' + (data.detail || 'Error removing member');
+                    }
+                } catch(e) { this.slackOk = false; this.slackMsg = '✗ Network error'; }
+                finally { this.saving = false; }
+            },
+
+            // ── Jira ──────────────────────────────────────────────────────────
+            async createJiraProject() {
+                const key    = (this.jira.input_key     || '').trim().toUpperCase().replace(/[^A-Z]/g, '');
+                const leadId = (this.jira.input_lead_id || '').trim();
+                // Client-side quick validation
+                if (!key)    { this.jiraOk = false; this.jiraMsg = '✗ Project key is required'; return; }
+                if (key.length < 2 || key.length > 7)
+                             { this.jiraOk = false; this.jiraMsg = '✗ Key must be 2–7 letters'; return; }
+                if (!leadId) { this.jiraOk = false; this.jiraMsg = '✗ Please select a lead user'; return; }
+                this.saving = true; this.jiraMsg = `⏳ Creating Jira project '${key}'…`; this.jiraOk = true;
+                try {
+                    const r = await fetch(`/jira/organization/${this.orgId}/create-project`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ project_key: key, lead_user_id: leadId })
+                    });
+                    const data = await r.json();
+                    if (r.ok) {
+                        this.jiraOk  = true;
+                        this.jiraMsg = `✓ Project '${data.project_key}' created`;
+                        this.jira.project_key  = data.project_key;
+                        this.jira.project_id   = data.project_id;
+                        this.jira.project_name = data.project_name;
+                        this.jira.board_url    = data.board_url;
+                        window.integrationsApp && window.integrationsApp.reload();
+                    } else if (r.status === 409) {
+                        this.jiraOk  = false;
+                        const d = data.detail || {};
+                        this.jiraMsg = '✗ ' + (d.message || 'Project already linked') + '. ' + (d.hint || '');
+                    } else {
+                        this.jiraOk  = false;
+                        this.jiraMsg = '✗ ' + (data.detail || 'Error creating project');
+                    }
+                } catch(e) { this.jiraOk = false; this.jiraMsg = '✗ Network error'; }
+                finally { this.saving = false; }
+            },
+
+            async saveJira() {
+                const key  = (this.jira.input_key  || '').trim().toUpperCase();
+                const name = (this.jira.input_name || '').trim();
+                if (!key) { this.jiraOk = false; this.jiraMsg = '✗ Project key is required'; return; }
+                this.saving = true; this.jiraMsg = '';
+                try {
+                    const r = await fetch(`/jira/organization/${this.orgId}/project`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ project_key: key, project_name: name || key })
+                    });
+                    const data = await r.json();
+                    if (r.ok) {
+                        this.jiraOk  = true;
+                        this.jiraMsg = `✓ Project '${data.project_key}' linked`;
+                        this.jira.project_key  = data.project_key;
+                        this.jira.project_name = data.project_name;
+                        this.jira.board_url    = data.board_url;
+                        window.integrationsApp && window.integrationsApp.reload();
+                    } else {
+                        this.jiraOk  = false;
+                        this.jiraMsg = '✗ ' + (data.detail || 'Error linking project');
+                    }
+                } catch(e) { this.jiraOk = false; this.jiraMsg = '✗ Network error'; }
+                finally { this.saving = false; }
+            },
+
+            async unlinkJira() {
+                if (!confirm('Unlink this Jira project from the organization?\n\nThis removes the connection in hyOps but does NOT delete the project in Jira.')) return;
+                this.saving = true; this.jiraMsg = '';
+                try {
+                    const r = await fetch(`/jira/organization/${this.orgId}/project`, { method: 'DELETE' });
+                    const data = await r.json();
+                    if (r.ok) {
+                        this.jiraOk  = true;
+                        this.jiraMsg = '✓ Jira project unlinked';
+                        this.jira = { project_key: '', project_id: '', project_name: '', board_url: '', input_key: '', input_name: '', input_lead_id: (Alpine.store('modal').jiraLeadUsers[0] || {}).id || '' };
+                        window.integrationsApp && window.integrationsApp.reload();
+                    } else {
+                        this.jiraOk  = false;
+                        this.jiraMsg = '✗ ' + (data.detail || 'Error unlinking');
+                    }
+                } catch(e) { this.jiraOk = false; this.jiraMsg = '✗ Network error'; }
                 finally { this.saving = false; }
             }
         });
@@ -681,9 +1237,17 @@
                 actionMsg: '', actionOk: true,
             },
 
+            jiraLeadUsers: [],   // populated on init — used by modal dropdown
+
+            jiraAdmin: {
+                users: [], loading: false, loaded: false, error: '',
+                newUsername: '', newAccountId: '',
+                saving: false, msg: '', ok: true,
+            },
+
             async init() {
                 window.integrationsApp = this;
-                await this.fetchOrgs();
+                await Promise.all([this.fetchOrgs(), this.loadJiraLeadUsers()]);
                 this._modal = new bootstrap.Modal(document.getElementById('configModal'));
             },
 
@@ -696,14 +1260,18 @@
 
                     // Fetch integration data for each org in parallel
                     await Promise.all(orgs.map(async org => {
-                        const [mbRes, teamsRes, slackRes] = await Promise.all([
+                        const [mbRes, teamsRes, slackRes, jiraRes] = await Promise.all([
                             fetch(`/metabase/organization/${org.id}/group`).catch(() => null),
                             fetch(`/teams/organization/${org.id}/group`).catch(() => null),
-                            fetch(`/slack/organization/${org.id}/channel`).catch(() => null),
+                            fetch(`/slack/organization/${org.id}/channels`).catch(() => null),
+                            fetch(`/jira/organization/${org.id}/project`).catch(() => null),
                         ]);
                         org._metabase = mbRes && mbRes.ok ? await mbRes.json() : null;
-                        org._teams    = teamsRes && teamsRes.ok ? await teamsRes.json() : null;
-                        org._slack    = slackRes && slackRes.ok ? await slackRes.json() : null;
+                        const teamsData = teamsRes && teamsRes.ok ? await teamsRes.json() : null;
+                        org._teams    = teamsData;
+                        const slackData = slackRes && slackRes.ok ? await slackRes.json() : null;
+                        org._slack    = slackData ? (slackData.channels || []) : [];
+                        org._jira     = jiraRes && jiraRes.ok ? await jiraRes.json() : null;
                     }));
 
                     this.orgs = orgs;
@@ -793,6 +1361,83 @@
                 } catch(e) { this.admin.actionOk = false; this.admin.actionMsg = '✗ Network error'; }
             },
 
+            // ── Jira lead user management ──────────────────────────────────────
+            async loadJiraLeadUsers() {
+                // Silently loads lead users on init — syncs both the admin panel
+                // list and the modal store so the dropdown can access them.
+                try {
+                    const r = await fetch('/jira/lead-users');
+                    if (r.ok) {
+                        const users = await r.json();
+                        this.jiraLeadUsers = users;
+                        Alpine.store('modal').jiraLeadUsers = users;
+                    }
+                } catch(e) { /* non-fatal */ }
+            },
+
+            async loadJiraLeadUsersAdmin() {
+                // Loads for the admin panel (user-triggered)
+                this.jiraAdmin.loading = true; this.jiraAdmin.error = '';
+                try {
+                    const r = await fetch('/jira/lead-users');
+                    if (r.ok) {
+                        this.jiraAdmin.users  = await r.json();
+                        this.jiraAdmin.loaded = true;
+                    } else {
+                        this.jiraAdmin.error = 'Failed to load lead users';
+                    }
+                } catch(e) { this.jiraAdmin.error = 'Network error'; }
+                finally { this.jiraAdmin.loading = false; }
+            },
+
+            async addJiraLeadUser() {
+                const username   = (this.jiraAdmin.newUsername  || '').trim().toLowerCase();
+                const accountId  = (this.jiraAdmin.newAccountId || '').trim();
+                if (!username || !accountId) return;
+                this.jiraAdmin.saving = true; this.jiraAdmin.msg = ''; this.jiraAdmin.ok = true;
+                try {
+                    const r = await fetch('/jira/lead-users', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, jira_account_id: accountId }),
+                    });
+                    const data = await r.json();
+                    if (r.ok) {
+                        this.jiraAdmin.users.push(data);
+                        this.jiraLeadUsers.push(data);
+                        Alpine.store('modal').jiraLeadUsers = [...this.jiraLeadUsers]; // sync modal
+                        this.jiraAdmin.newUsername  = '';
+                        this.jiraAdmin.newAccountId = '';
+                        this.jiraAdmin.ok  = true;
+                        this.jiraAdmin.msg = `✓ '${data.username}' added`;
+                    } else {
+                        this.jiraAdmin.ok  = false;
+                        this.jiraAdmin.msg = '✗ ' + (data.detail || 'Error adding user');
+                    }
+                } catch(e) { this.jiraAdmin.ok = false; this.jiraAdmin.msg = '✗ Network error'; }
+                finally { this.jiraAdmin.saving = false; }
+            },
+
+            async deleteJiraLeadUser(userId) {
+                if (!confirm('Remove this lead user from the list?\n\nThis will not affect existing Jira projects.')) return;
+                this.jiraAdmin.saving = true; this.jiraAdmin.msg = ''; this.jiraAdmin.ok = true;
+                try {
+                    const r = await fetch(`/jira/lead-users/${userId}`, { method: 'DELETE' });
+                    const data = await r.json();
+                    if (r.ok) {
+                        this.jiraAdmin.users  = this.jiraAdmin.users.filter(u => u.id !== userId);
+                        this.jiraLeadUsers    = this.jiraLeadUsers.filter(u => u.id !== userId);
+                        Alpine.store('modal').jiraLeadUsers = [...this.jiraLeadUsers]; // sync modal
+                        this.jiraAdmin.ok  = true;
+                        this.jiraAdmin.msg = data.detail || '✓ Removed';
+                    } else {
+                        this.jiraAdmin.ok  = false;
+                        this.jiraAdmin.msg = '✗ ' + (data.detail || 'Error removing');
+                    }
+                } catch(e) { this.jiraAdmin.ok = false; this.jiraAdmin.msg = '✗ Network error'; }
+                finally { this.jiraAdmin.saving = false; }
+            },
+
             openModal(org) {
                 const s = Alpine.store('modal');
                 s.orgId   = org.id;
@@ -803,14 +1448,24 @@
                 s.teams = org._teams
                     ? { external_id: org._teams.external_id, name: org._teams.name }
                     : { external_id: '', name: '' };
-                s.slack = org._slack
-                    ? { external_id: org._slack.external_id, channel_name: org._slack.channel_name }
-                    : { external_id: '', channel_name: '' };
+                const slackList = org._slack || [];
+                s.slackChannels = {
+                    client:      slackList.find(c => c.channel_type === 'client')      || null,
+                    ext_partner: slackList.find(c => c.channel_type === 'ext_partner') || null,
+                };
                 // Reset message + members state
                 s.metabaseMsg = ''; s.metabaseOk = true;
                 s.teamsMsg = ''; s.teamsOk = true;
                 s.teamsMembers = []; s.teamsMembersLoaded = false; s.teamsLoadingMembers = false;
+                s.spMsg = ''; s.spOk = true; s.spSiteUrl = '';
+                s.spCopiedAt = org._teams ? org._teams.sharepoint_copied_at : null;
                 s.slackMsg = ''; s.slackOk = true;
+                s.slackMembersType = null; s.slackCurrentMembers = []; s.slackMembersLoaded = false; s.slackLoadingMembers = false;
+                const defaultLeadId = (Alpine.store('modal').jiraLeadUsers[0] || {}).id || '';
+                s.jira = org._jira
+                    ? { project_key: org._jira.project_key, project_id: org._jira.project_id, project_name: org._jira.project_name, board_url: org._jira.board_url, input_key: '', input_name: '', input_lead_id: defaultLeadId }
+                    : { project_key: '', project_id: '', project_name: '', board_url: '', input_key: '', input_name: '', input_lead_id: defaultLeadId };
+                s.jiraMsg = ''; s.jiraOk = true;
                 this._modal.show();
             }
         }

@@ -173,3 +173,5 @@ dataset
 app_cli.py
 /.vscode
 app/logs/app.log
+# Generated documents (runtime output)
+app/generated_documents/

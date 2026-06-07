@@ -28,6 +28,14 @@ class IntegrationSettings(BaseSettings):
     TEAMS_TEAM_ID: Optional[str] = None  # legacy — per-org teams now stored in DB
     TEAMS_ADMIN_USER_ID: str = "02f15082-7848-48ac-830f-3af9db319dee"  # Stephan power-admin
 
+    # Slack
+    SLACK_BOT_TOKEN: Optional[str] = None  # xoxb-... from OAuth & Permissions
+
+    # Jira / Confluence (Atlassian)
+    JIRA_BASE_URL:  Optional[str] = None   # https://hypatos.atlassian.net
+    JIRA_EMAIL:     Optional[str] = None   # admin email for Basic auth
+    JIRA_API_TOKEN: Optional[str] = None   # Atlassian API token
+
     # Email (SMTP)
     SMTP_HOST: Optional[str] = None
     SMTP_PORT: int = 587

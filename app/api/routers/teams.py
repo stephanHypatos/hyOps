@@ -2,22 +2,23 @@
 Microsoft Teams integration endpoints.
 
 Org-level:
-    GET    /teams/teams                               — list all Teams in tenant
-    GET    /teams/organization/{org_id}/group         — get linked team for org
-    POST   /teams/organization/{org_id}/create-team   — check dup + create + store
-    PUT    /teams/organization/{org_id}/group         — link existing team by ID
-    DELETE /teams/organization/{org_id}/group         — unlink team from org (DB only)
-    GET    /teams/organization/{org_id}/members       — live team members from Graph
-    DELETE /teams/organization/{org_id}/members/{mid} — remove a member from the team
+    GET    /teams/teams                                    — list all Teams in tenant
+    GET    /teams/organization/{org_id}/group              — get linked team for org
+    POST   /teams/organization/{org_id}/create-team        — check dup + create + store
+    PUT    /teams/organization/{org_id}/group              — link existing team by ID
+    DELETE /teams/organization/{org_id}/group              — unlink team from org (DB only)
+    GET    /teams/organization/{org_id}/members            — live team members from Graph
+    DELETE /teams/organization/{org_id}/members/{mid}      — remove a member from the team
+    POST   /teams/organization/{org_id}/copy-sharepoint    — copy CSTemplates folder to org SharePoint
 
 User-level:
-    POST   /teams/user/{user_id}/add                  — get-or-invite + add to team
-    GET    /teams/user/{user_id}/membership           — live membership status for this user
-    DELETE /teams/user/{user_id}/remove               — remove user from their org's team
+    POST   /teams/user/{user_id}/add                       — get-or-invite + add to team
+    GET    /teams/user/{user_id}/membership                — live membership status for this user
+    DELETE /teams/user/{user_id}/remove                    — remove user from their org's team
 
 Admin:
-    GET    /teams/users                               — list all Azure AD users
-    DELETE /teams/users/{user_object_id}              — permanently delete Azure AD user
+    GET    /teams/users                                    — list all Azure AD users
+    DELETE /teams/users/{user_object_id}                   — permanently delete Azure AD user
 """
 
 import logging
@@ -29,6 +30,7 @@ from pydantic import BaseModel
 from sqlmodel import select
 
 from app.adapters import teams as teams_adapter
+from app.adapters import sharepoint as sharepoint_adapter
 from app.database.models import (
     Organization,
     OrganizationTeamsGroup,
@@ -94,7 +96,12 @@ async def get_teams_group_for_org(org_id: UUID, session: SessionDep):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No Teams group configured for this organization",
         )
-    return {"external_id": group.external_id, "name": group.name, "id": str(group.id)}
+    return {
+        "external_id": group.external_id,
+        "name": group.name,
+        "id": str(group.id),
+        "sharepoint_copied_at": group.sharepoint_copied_at.isoformat() if group.sharepoint_copied_at else None,
+    }
 
 
 @router.post("/organization/{org_id}/create-team")
@@ -268,6 +275,58 @@ async def remove_team_member_for_org(org_id: UUID, membership_id: str, session: 
     except Exception as e:
         logger.error("Teams remove_member error: %s", e, exc_info=True)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Teams error: {e}")
+
+
+# ── SharePoint copy ───────────────────────────────────────────────────────────
+
+@router.post("/organization/{org_id}/copy-sharepoint")
+async def copy_sharepoint_template(org_id: UUID, session: SessionDep):
+    """
+    Copy the 'Project' template folder (and all its children) from the CSTemplates
+    SharePoint site into the root of the org's Teams-linked SharePoint document library.
+
+    Source : https://hypatos.sharepoint.com/sites/CSTemplates  (folder: Project)
+    Dest   : Root of the Teams-linked SharePoint site for this org
+
+    Requires the Azure AD app to have 'Sites.ReadWrite.All' permission.
+    Stamps sharepoint_copied_at on success.
+    """
+    result = await session.execute(
+        select(OrganizationTeamsGroup).where(OrganizationTeamsGroup.organization_id == org_id)
+    )
+    org_group = result.scalars().first()
+    if org_group is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No Teams team linked to this organization. Create or link one first.",
+        )
+
+    try:
+        data = await sharepoint_adapter.copy_template_to_org(org_group.external_id)
+    except Exception as exc:
+        logger.error("SharePoint copy error (org=%s, group=%s): %s", org_id, org_group.external_id, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"SharePoint error: {exc}",
+        )
+
+    copy_status = data.get("status", "unknown")
+    succeeded   = copy_status in ("completed", "inProgress")  # inProgress = started OK, completing async
+
+    # Stamp the DB on any non-error outcome so the UI shows the copy was initiated
+    if succeeded:
+        from datetime import datetime
+        org_group.sharepoint_copied_at = datetime.utcnow()
+        session.add(org_group)
+        await session.commit()
+
+    return {
+        "org_site_url":        data["org_site_url"],
+        "template_site_url":   data["template_site_url"],
+        "folder_name":         data.get("folder_name", "Project"),
+        "status":              copy_status,
+        "sharepoint_copied_at": org_group.sharepoint_copied_at.isoformat() if org_group.sharepoint_copied_at else None,
+    }
 
 
 # ── User-level ────────────────────────────────────────────────────────────────

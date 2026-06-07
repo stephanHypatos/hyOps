@@ -202,7 +202,9 @@
                 <!-- Slack -->
                 <div class="p-3 border rounded">
                     <h6 class="fw-bold mb-3">💬 Slack</h6>
-                    <div id="slackStatus" class="mb-2 small text-muted">—</div>
+                    <div id="slackChannelList" class="mb-3">
+                        <span class="text-muted small">Loading…</span>
+                    </div>
                     <button class="btn btn-sm btn-primary" id="btnAddSlack">Add to Slack</button>
                     <div id="slackActionMsg" class="mt-2 small"></div>
                 </div>
@@ -390,7 +392,6 @@
                 const mbMsg         = document.getElementById('mbActionMsg');
                 const teamsStatus   = document.getElementById('teamsStatus');
                 const teamsMsg      = document.getElementById('teamsActionMsg');
-                const slackStatus   = document.getElementById('slackStatus');
                 const slackMsg      = document.getElementById('slackActionMsg');
 
                 const teamsMembership = document.getElementById('teamsMembership');
@@ -402,7 +403,8 @@
                 teamsStatus.innerHTML = '<span class="text-muted">Loading…</span>';
                 teamsMembership.innerHTML = '';
                 teamsMsg.textContent = '';
-                slackStatus.textContent = '—'; slackMsg.textContent = '';
+                document.getElementById('slackChannelList').innerHTML = '<span class="text-muted small">Loading…</span>';
+                slackMsg.textContent = '';
 
                 // Always fetch live membership state from the API
                 const loadMbMemberships = () => {
@@ -547,7 +549,59 @@
                     btnTeams.disabled = false; btnTeams.textContent = 'Add to Teams';
                 };
 
-                // Slack button
+                // ── Slack ──────────────────────────────────────────────────────
+                const slackChannelList = document.getElementById('slackChannelList');
+
+                const renderSlackChannels = (channels) => {
+                    if (!channels || channels.length === 0) {
+                        slackChannelList.innerHTML = '<p class="small text-muted mb-0">No Slack channels configured for this organization.</p>';
+                        return;
+                    }
+                    const rows = channels.map(ch => {
+                        const linked = ch.user_is_linked;
+                        const badge = linked
+                            ? `<span class="badge bg-success">✓ In channel</span>`
+                            : `<span class="badge bg-secondary">Not in channel</span>`;
+                        const removeBtn = linked
+                            ? `<button class="btn btn-sm btn-outline-danger ms-2 py-0"
+                                       onclick="removeFromSlackChannel('${user.id}', '${ch.channel_type}', this)">
+                                   Remove
+                               </button>`
+                            : '';
+                        return `<tr>
+                            <td class="small fw-semibold">${ch.channel_name}</td>
+                            <td class="small text-muted">${ch.channel_type === 'client' ? 'internal' : 'internal + partner'}</td>
+                            <td>${badge}${removeBtn}</td>
+                        </tr>`;
+                    }).join('');
+                    slackChannelList.innerHTML = `
+                        <table class="table table-sm table-bordered mb-0" style="font-size:0.83rem;">
+                            <thead class="table-light">
+                                <tr><th>Channel</th><th>For</th><th>Status</th></tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>`;
+                };
+
+                const loadSlackChannels = () => {
+                    slackChannelList.innerHTML = '<span class="text-muted small">Loading…</span>';
+                    fetch(`/slack/user/${user.id}/channels`)
+                        .then(async r => {
+                            if (!r.ok) {
+                                slackChannelList.innerHTML = '<span class="text-danger small">Could not load Slack status.</span>';
+                                return;
+                            }
+                            const data = await r.json();
+                            renderSlackChannels(data.org_channels || []);
+                        })
+                        .catch(() => {
+                            slackChannelList.innerHTML = '<span class="text-muted small">Could not load Slack status.</span>';
+                        });
+                };
+
+                loadSlackChannels();
+
+                // Add to Slack button — adds to all appropriate channels for this user type
                 const btnSlack = document.getElementById('btnAddSlack');
                 btnSlack.onclick = async () => {
                     btnSlack.disabled = true; btnSlack.textContent = 'Adding…';
@@ -556,10 +610,18 @@
                         const r = await fetch(`/slack/user/${user.id}/add`, { method: 'POST' });
                         const data = await r.json();
                         if (r.ok) {
-                            slackMsg.textContent = `✓ Linked to ${data.slack_channel}`;
+                            const results = data.channels || [];
+                            const invited = results.filter(c => c.status === 'invited').map(c => c.channel_name);
+                            const already = results.filter(c => c.status === 'already_member').map(c => c.channel_name);
+                            const notFound = results.filter(c => c.status === 'not_found_in_slack').map(c => c.channel_name);
+                            let msg = '';
+                            if (invited.length) msg += `✓ Invited to: ${invited.join(', ')}. `;
+                            if (already.length) msg += `Already in: ${already.join(', ')}. `;
+                            if (notFound.length) msg += `⚠ Not found in Slack for: ${notFound.join(', ')}. `;
+                            if (data.errors && data.errors.length) msg += `✗ Errors: ${data.errors.map(e=>e.error).join(', ')}`;
+                            slackMsg.textContent = msg || '✓ Done';
                             slackMsg.className = 'mt-2 small text-success';
-                            slackStatus.textContent = `✓ Linked to ${data.slack_channel}`;
-                            slackStatus.className = 'mb-2 small text-success';
+                            loadSlackChannels();  // refresh
                         } else {
                             slackMsg.textContent = '✗ ' + (data.detail || 'Error');
                             slackMsg.className = 'mt-2 small text-danger';
@@ -598,6 +660,36 @@
                 if (tbody && tbody.children.length === 0) {
                     document.getElementById('teamsMembership').innerHTML =
                         '<p class="small text-muted mb-0">No active team memberships.</p>';
+                }
+            } else {
+                const data = await r.json().catch(() => ({}));
+                alert('Failed to remove: ' + (data.detail || 'Unknown error'));
+                btn.disabled = false;
+                btn.textContent = 'Remove';
+            }
+        } catch(e) {
+            alert('Network error');
+            btn.disabled = false;
+            btn.textContent = 'Remove';
+        }
+    }
+
+    async function removeFromSlackChannel(userId, channelType, btn) {
+        if (!confirm('Remove this user from the Slack channel?')) return;
+        btn.disabled = true;
+        btn.textContent = 'Removing…';
+        try {
+            const r = await fetch(`/slack/user/${userId}/remove`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ channel_type: channelType })
+            });
+            if (r.ok) {
+                const row = btn.closest('tr');
+                if (row) {
+                    // Update badge to "Not in channel", remove the remove button
+                    const statusCell = row.querySelector('td:last-child');
+                    if (statusCell) statusCell.innerHTML = '<span class="badge bg-secondary">Not in channel</span>';
                 }
             } else {
                 const data = await r.json().catch(() => ({}));

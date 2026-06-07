@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from .routers import organization, user, subtype, capability, feature, skill, language, document_template, project, usecase
-from .routers import metabase, teams, slack
+from .routers import metabase, teams, slack, jira
 
 # Single router to group all api routers
 master_router = APIRouter()
@@ -21,3 +21,4 @@ master_router.include_router(usecase.router)
 master_router.include_router(metabase.router)
 master_router.include_router(teams.router)
 master_router.include_router(slack.router)
+master_router.include_router(jira.router)

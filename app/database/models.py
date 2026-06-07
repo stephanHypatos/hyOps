@@ -1,5 +1,5 @@
 from sqlmodel import SQLModel, Field, Relationship, Column
-from sqlalchemy import Numeric
+from sqlalchemy import Numeric, String
 from sqlalchemy.dialects import postgresql
 from enum import Enum
 from datetime import datetime, date
@@ -206,6 +206,10 @@ class Organization(SQLModel, table=True):
         sa_column=Column(postgresql.UUID, default=uuid4, primary_key=True)
     )
     name: str
+    key: Optional[str] = Field(
+        default=None,
+        sa_column=Column(String(7), nullable=True, unique=True, index=True),
+    )
     type: OrganizationType
     email: EmailStr
     industry: str
@@ -230,6 +234,10 @@ class Organization(SQLModel, table=True):
         sa_relationship_kwargs={"lazy": "selectin"},
     )
     slack_channels: list["OrganizationSlackChannel"] = Relationship(
+        back_populates="organization",
+        sa_relationship_kwargs={"lazy": "selectin"},
+    )
+    jira_projects: list["OrganizationJiraProject"] = Relationship(
         back_populates="organization",
         sa_relationship_kwargs={"lazy": "selectin"},
     )
@@ -744,6 +752,7 @@ class OrganizationTeamsGroup(SQLModel, table=True):
     external_id: str
     name: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    sharepoint_copied_at: Optional[datetime] = Field(default=None)  # set when template folder is copied
 
     organization: Organization = Relationship(
         back_populates="teams_groups",
@@ -763,8 +772,9 @@ class OrganizationSlackChannel(SQLModel, table=True):
         sa_column=Column(postgresql.UUID, default=uuid4, primary_key=True)
     )
     organization_id: UUID = Field(foreign_key="organization.id")
-    external_id: str
-    channel_name: str
+    external_id: str        # Slack channel ID (C01234ABCDE)
+    channel_name: str       # human-readable Slack channel name
+    channel_type: str = Field(default="client")  # "client" or "ext_partner"
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     organization: Organization = Relationship(
@@ -776,6 +786,38 @@ class OrganizationSlackChannel(SQLModel, table=True):
         link_model=UserSlackChannel,
         sa_relationship_kwargs={"lazy": "selectin"},
     )
+
+
+class OrganizationJiraProject(SQLModel, table=True):
+    __tablename__ = "organization_jira_project"
+
+    id: UUID = Field(
+        sa_column=Column(postgresql.UUID, default=uuid4, primary_key=True)
+    )
+    organization_id: UUID = Field(foreign_key="organization.id")
+    project_key:  str              # e.g. "FNK"  (Jira project key)
+    project_id:   str              # Jira internal numeric ID
+    project_name: str              # display name
+    board_url:    str              # https://…/jira/core/projects/{KEY}/board
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    organization: Organization = Relationship(
+        back_populates="jira_projects",
+        sa_relationship_kwargs={"lazy": "selectin"},
+    )
+
+
+class JiraLeadUser(SQLModel, table=True):
+    """Global list of Jira users eligible to be project leads.
+    Managed via the admin panel in the integrations page."""
+    __tablename__ = "jira_lead_user"
+
+    id: UUID = Field(
+        sa_column=Column(postgresql.UUID, default=uuid4, primary_key=True)
+    )
+    username: str = Field(unique=True, index=True)   # human-readable key, e.g. "stephan.kuche"
+    jira_account_id: str                              # Atlassian account ID
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class OrganizationMetabaseGroup(SQLModel, table=True):

@@ -1,6 +1,6 @@
 # hyOps
 
-A FastAPI backend for managing the full lifecycle of customer implementation projects — from organizations and users to scoping, document generation, and ERP integrations.
+Internal ops tool for the Hypatos CS team — manages the full lifecycle of customer implementations, from organisations and users to scoping, document generation, and third-party integrations.
 
 ---
 
@@ -8,10 +8,11 @@ A FastAPI backend for managing the full lifecycle of customer implementation pro
 
 | Layer | Technology |
 |---|---|
-| Framework | [FastAPI](https://fastapi.tiangolo.com/) |
-| ORM | [SQLModel](https://sqlmodel.tiangolo.com/) + SQLAlchemy (async) |
+| Framework | [FastAPI](https://fastapi.tiangolo.com/) (async) |
+| ORM | [SQLModel](https://sqlmodel.tiangolo.com/) + SQLAlchemy async |
 | Database | PostgreSQL (asyncpg driver) |
 | Containerization | Docker + Docker Compose |
+| Frontend | Jinja2 + Alpine.js + Bootstrap 5 |
 | API Docs | Scalar / Swagger UI |
 | Settings | Pydantic Settings + `.env` |
 
@@ -19,45 +20,51 @@ A FastAPI backend for managing the full lifecycle of customer implementation pro
 
 ## Features
 
-- **Organizations** — manage customers, partners, and internal entities with regional and industry metadata
-- **Users** — track stakeholders by role, subtype, skills, and languages across organizations
-- **Projects** — full project lifecycle (pilot, PoC, custom demo, rollout) with rich discovery fields covering document processing, ERP integration, classification, PO matching, and KPIs
-- **Capabilities & Features** — define platform capabilities, scope specifications, cost drivers, and effort estimations by team
-- **Use Cases** — link use cases to features and projects
-- **Document Templates** — create Markdown or DOCX templates (SOW, Success Contract, Solution Design) with variable substitution
-- **Document Generation** — generate project-specific documents from templates
-- **ERP Systems & Connectors** — track SAP, Coupa, Oracle, and other ERP integrations per project
-- **Integrations** — Teams groups, Slack channels, Metabase groups, HyStudio companies, and API credentials per organization
+### Core
+- **Organisations** — manage customers, partners, and internal entities; unique auto-generated org key (2–7 alpha); industry dropdown (25 categories + Other); country dropdown (ISO Alpha-2)
+- **Users** — stakeholders by role (`admin`/`enduser`), type (`customer`/`partner`/`internal`), skills, and languages
+- **Projects** — full lifecycle (pilot, PoC, custom demo, rollout) with rich discovery fields
+- **Capabilities & Features** — scope specs, cost drivers, effort estimation by team
+- **Use Cases** — linked to features and projects
+- **Document Templates & Generation** — Markdown/DOCX templates (SOW, Success Contract, Solution Design) with variable substitution
+- **ERP Systems & Connectors** — SAP, Coupa, Oracle, and others per project
+
+### Integrations (managed per organisation on the Integrations page)
+
+| Integration | What it does |
+|---|---|
+| **Microsoft Teams** | Creates a private Teams group for the org; manages member provisioning |
+| **SharePoint** | Copies the standard "Project" folder template from CSTemplates to the org's Teams SharePoint |
+| **Slack** | Creates two private channels: `client-{org}` (internal users) and `ext-partner-{org}` (internal + partner users); manages members |
+| **Jira** | Creates a company-managed Jira Core board (`{org} x Hypatos`); assigns standard Hypatos workflow/permission schemes; OR links an existing project by key |
+| **Metabase** | Creates or links a Metabase group for the org |
 
 ---
 
 ## Getting Started
 
 ### Prerequisites
-
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 
-### Run with local PostgreSQL (recommended for development)
+### 1 — Clone and configure
 
 ```bash
 git clone https://github.com/stephanHypatos/hyOps.git
 cd hyOps
+cp .env.sample .env   # then fill in your values
+```
+
+### 2 — Start
+
+```bash
 docker compose up --build
 ```
 
-The app will be available at **http://localhost:8000**
+The app is available at **http://localhost:8000**. Tables are created automatically on first start.
 
-> The database tables are created automatically on first startup.
+### Remote database (Supabase / RDS)
 
-### Run with a remote database (e.g. Supabase)
-
-Create a `.env` file in the project root:
-
-```env
-POSTGRESQL_URL=postgresql+asyncpg://<user>:<password>@<host>:<port>/<db>
-```
-
-Then start only the API container:
+Set only `POSTGRESQL_URL` in `.env` and start only the API container:
 
 ```bash
 docker compose up --build api
@@ -67,17 +74,33 @@ docker compose up --build api
 
 ## Environment Variables
 
-| Variable | Description |
-|---|---|
-| `POSTGRESQL_URL` | Full async PostgreSQL connection string |
+Create a `.env` file at the project root (never commit it — it is in `.gitignore`):
 
-Copy `.env.sample` to `.env` and fill in your values.
+```env
+# Database
+POSTGRESQL_URL=postgresql+asyncpg://<user>:<password>@<host>:<port>/<db>
+
+# Microsoft Azure (Teams + SharePoint)
+AZURE_TENANT_ID=<directory-tenant-id>
+AZURE_CLIENT_ID=<app-registration-client-id>
+AZURE_CLIENT_SECRET=<client-secret-value>
+
+# Slack
+SLACK_BOT_TOKEN=xoxb-…
+
+# Jira / Atlassian
+JIRA_BASE_URL=https://hypatos.atlassian.net
+JIRA_EMAIL=<service-account-email>
+JIRA_API_TOKEN=<atlassian-api-token>
+
+# Metabase
+METABASE_URL=https://insights.hypatos.ai/
+METABASE_API_KEY=mb_…
+```
 
 ---
 
 ## API Documentation
-
-Once running, the interactive API docs are available at:
 
 | Interface | URL |
 |---|---|
@@ -91,54 +114,64 @@ Once running, the interactive API docs are available at:
 ```
 hyOps/
 ├── app/
-│   ├── main.py               # FastAPI app entry point & HTML routes
-│   ├── config.py             # Settings (reads from .env)
+│   ├── main.py                   # App entry point, HTML routes
+│   ├── config.py                 # Settings (reads .env)
 │   ├── api/
-│   │   ├── router.py         # Master router
-│   │   ├── routers/          # Endpoint handlers per module
-│   │   └── schemas/          # Pydantic request/response schemas
+│   │   ├── router.py             # Master router
+│   │   ├── routers/              # Endpoint handlers per domain
+│   │   └── schemas/              # Pydantic request/response schemas
 │   ├── database/
-│   │   ├── models.py         # SQLModel table definitions
-│   │   └── session.py        # Async engine & session management
-│   ├── modules/              # Business logic (document generation, etc.)
-│   ├── adapters/             # External service adapters
-│   ├── templates/            # Jinja2 HTML templates
-│   ├── doc_templates/        # Document template files
-│   └── consts/               # Constants and form questions
+│   │   ├── models.py             # All SQLModel table definitions
+│   │   └── session.py            # Async engine + SessionDep
+│   ├── adapters/                 # External service integrations
+│   │   ├── jira.py               # Atlassian Jira
+│   │   ├── slack.py              # Slack Web API
+│   │   ├── sharepoint.py         # Microsoft Graph / SharePoint
+│   │   ├── teams.py              # Microsoft Graph / Teams
+│   │   └── metabase.py           # Metabase
+│   ├── templates/                # Jinja2 HTML templates
+│   └── modules/                  # Business logic (doc generation, etc.)
+├── docs/
+│   └── admin-guide.md            # Admin user guide
+├── migrate_*.py                  # One-shot DB migration scripts
+├── CLAUDE.md                     # AI assistant context file
 ├── Dockerfile
 ├── docker-compose.yml
-├── requirements.txt
-└── .env.sample
+└── requirements.txt
 ```
 
 ---
 
-## Data Model Overview
+## Data Model
 
 ```
-Organization
-  └── Users (roles: admin, enduser | types: customer, partner, internal)
-  └── Projects
-        └── Stakeholders (Users)
-        └── Use Cases
-        └── Generated Documents
-        └── ERP Connectors
-  └── ERP Systems
-  └── Teams Groups / Slack Channels / Metabase Groups / HyStudio Companies
+Organization  (key, industry, country)
+  ├── Users               (role, type, skills, languages)
+  ├── Projects            (lifecycle, discovery fields, ERP, docs)
+  ├── OrganizationTeamsGroup      → Teams group + SharePoint copy status
+  ├── OrganizationSlackChannel    → client + ext-partner channels
+  ├── OrganizationJiraProject     → Jira board link
+  └── OrganizationMetabaseGroup   → Metabase group link
 
-Capabilities
-  └── Features
-        └── Scope Specifications
-        └── Cost Drivers
-        └── Feature Efforts (by team type)
-        └── Use Cases
-
-Document Templates → Generated Documents
+JiraLeadUser              (global list of eligible Jira project leads)
+Capabilities → Features → ScopeSpec / CostDriver / FeatureEffort / UseCases
+DocumentTemplates → GeneratedDocuments
 ```
 
 ---
 
-## Docker Commands
+## Migrations
+
+Schema changes are managed with plain SQL scripts. Run them inside the container:
+
+```bash
+docker exec hyops_api python migrate_add_org_key.py
+docker exec hyops_api python migrate_add_jira_lead_user.py
+```
+
+---
+
+## Docker Reference
 
 | Action | Command |
 |---|---|
@@ -147,3 +180,5 @@ Document Templates → Generated Documents
 | Stop | `docker compose down` |
 | Stop + wipe DB | `docker compose down -v` |
 | View logs | `docker compose logs api -f` |
+| Run migration | `docker exec hyops_api python migrate_<name>.py` |
+| Open shell | `docker exec -it hyops_api sh` |
