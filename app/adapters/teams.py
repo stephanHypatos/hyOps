@@ -292,53 +292,79 @@ def _get_or_invite_user_sync(email: str, display_name: str, token: str) -> dict:
     return _invite_user_sync(email, display_name, token)
 
 
-def _add_user_to_team_sync(team_id: str, user_object_id: str, token: str, role: str = "member") -> None:
-    """Add a user to a Teams team. 409 = already a member → idempotent."""
-    roles_payload: list = ["owner"] if role == "owner" else []
+def _add_user_to_group_sync(group_id: str, user_object_id: str, token: str) -> None:
+    """
+    Add a user to the M365 group that backs the Teams team.
+    Uses POST /groups/{group_id}/members/$ref — works for external/guest users
+    and only requires Group.ReadWrite.All (not TeamMember.ReadWrite.All).
+    Idempotent: 400 "already exist" and 409 are treated as success.
+    """
     resp = httpx.post(
-        f"{_BASE}/teams/{team_id}/members",
-        json={
-            "@odata.type": "#microsoft.graph.aadUserConversationMember",
-            "roles": roles_payload,
-            "user@odata.bind": f"https://graph.microsoft.com/v1.0/users('{user_object_id}')",
-        },
+        f"{_BASE}/groups/{group_id}/members/$ref",
+        json={"@odata.id": f"https://graph.microsoft.com/v1.0/directoryObjects/{user_object_id}"},
         headers=_h(token),
         timeout=_TIMEOUT,
     )
-    if resp.status_code == 409:
-        logger.info("Teams: user %s already a member of team %s", user_object_id, team_id)
+    if resp.status_code == 204:
+        logger.info("Teams: added user %s to group %s", user_object_id, group_id)
         return
+    if resp.status_code == 409:
+        logger.info("Teams: user %s already in group %s (409)", user_object_id, group_id)
+        return
+    if resp.status_code == 400:
+        try:
+            msg = resp.json().get("error", {}).get("message", "")
+            if "already exist" in msg.lower():
+                logger.info("Teams: user %s already in group %s (400 already exists)", user_object_id, group_id)
+                return
+        except Exception:
+            pass
     resp.raise_for_status()
-    logger.info("Teams: added user %s to team %s as %s", user_object_id, team_id, role)
 
 
-def _get_team_members_sync(team_id: str, token: str) -> list:
-    """Get all members of a Teams team."""
-    resp = httpx.get(f"{_BASE}/teams/{team_id}/members", headers=_h(token), timeout=_TIMEOUT)
+def _get_team_members_sync(group_id: str, token: str) -> list:
+    """
+    Get all members of the M365 group that backs the Teams team.
+    Uses GET /groups/{group_id}/members (Groups API, not Teams members API).
+    Returns user_object_id as the membership_id so the Remove button can call
+    DELETE /groups/{group_id}/members/{user_object_id}/$ref.
+    """
+    resp = httpx.get(
+        f"{_BASE}/groups/{group_id}/members",
+        params={"$select": "id,displayName,mail,userPrincipalName"},
+        headers=_h(token),
+        timeout=_TIMEOUT,
+    )
     resp.raise_for_status()
     members = []
     for m in resp.json().get("value", []):
+        obj_id = m.get("id", "")
+        email = m.get("mail") or m.get("userPrincipalName", "")
         members.append({
-            "membership_id": m.get("id", ""),
-            "user_object_id": m.get("userId", ""),
+            "membership_id": obj_id,   # used by the Remove button
+            "user_object_id": obj_id,
             "display_name": m.get("displayName", ""),
-            "email": m.get("email", ""),
-            "roles": m.get("roles", []),
+            "email": email,
+            "roles": [],               # Groups API doesn't return team-specific roles
         })
     return members
 
 
-def _remove_member_from_team_sync(team_id: str, membership_id: str, token: str) -> bool:
-    """Remove a member from a team using their Teams membership ID."""
+def _remove_member_from_team_sync(group_id: str, user_object_id: str, token: str) -> bool:
+    """
+    Remove a user from the M365 group using DELETE /groups/{group_id}/members/{user_object_id}/$ref.
+    The `user_object_id` is the Azure AD object ID (same value returned as membership_id
+    by _get_team_members_sync).
+    """
     resp = httpx.delete(
-        f"{_BASE}/teams/{team_id}/members/{membership_id}",
+        f"{_BASE}/groups/{group_id}/members/{user_object_id}/$ref",
         headers=_h(token),
         timeout=_TIMEOUT,
     )
     if resp.status_code == 404:
         return False
     resp.raise_for_status()
-    logger.info("Teams: removed membership %s from team %s", membership_id, team_id)
+    logger.info("Teams: removed user %s from group %s", user_object_id, group_id)
     return True
 
 
@@ -373,18 +399,24 @@ def _delete_user_sync(user_object_id: str, token: str) -> None:
 
 # ── Compound sync helpers (token + operation in one thread) ───────────────────
 
-def _provision_user_to_team_sync(email: str, display_name: str, team_id: str) -> dict:
-    """Get-or-invite user, then add them to the team. Returns provision info."""
+def _provision_user_to_team_sync(email: str, display_name: str, group_id: str) -> dict:
+    """
+    Full user provisioning flow:
+      1. Check if user already exists in Azure AD by email
+      2. If not → POST /invitations (B2B guest invite, sends email)
+      3. POST /groups/{group_id}/members/$ref  (Groups API — no TeamMember permission needed)
+    """
     _check_config()
     token = _get_token_sync()
     user = _get_or_invite_user_sync(email, display_name, token)
-    # Small delay after invitation to let Azure AD propagate the new guest object
+    # Brief delay after a fresh invitation — Azure AD needs a moment to propagate the guest object
     if user.get("newly_invited"):
-        time.sleep(2)
-    _add_user_to_team_sync(team_id, user["id"], token)
+        logger.info("Teams: new guest invited, waiting 3s for Azure AD propagation…")
+        time.sleep(3)
+    _add_user_to_group_sync(group_id, user["id"], token)
     return {
         "teams_user_object_id": user["id"],
-        "teams_team_id": team_id,
+        "teams_team_id": group_id,
         "teams_guest_invited": user.get("newly_invited", False),
         "display_name": user.get("display_name", display_name),
     }
@@ -401,9 +433,9 @@ def _create_or_get_team_sync(name: str) -> dict:
     return {"id": team["id"], "name": team["name"], "created": True, "already_exists": False}
 
 
-def _get_user_team_membership_sync(teams_user_id: str, team_id: str, token: str) -> Optional[dict]:
-    """Return the user's Teams membership record in the given team, or None if not a member."""
-    members = _get_team_members_sync(team_id, token)
+def _get_user_team_membership_sync(teams_user_id: str, group_id: str, token: str) -> Optional[dict]:
+    """Return the user's group membership record, or None if not a member."""
+    members = _get_team_members_sync(group_id, token)
     for m in members:
         if m["user_object_id"] == teams_user_id:
             return m
