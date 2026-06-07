@@ -447,7 +447,7 @@
             userApi: "/user",
 
             projectPlaceholder: "# SOW for {{project.name}}\n\nCustomer: {{customer.name}}\nStart Date: {{project.start_date}}\nGo-Live: {{project.go_live_date}}",
-            emailPlaceholder: "Hi {{user.first_name}},\n\nWelcome to {{organization.name}}!\n\nHere are your access details:\n\n**Microsoft Teams:** {{teams.name}}\n**Slack channel:** {{slack_client.channel_name}}\n**Jira board:** {{jira.board_url}}\n**Metabase:** {{metabase.name}}\n\n**Documentation links:**\n{{#documentation_links}}- [{{link.title}}]({{link.url}}) — {{link.description}}\n{{/documentation_links}}\n\nBest regards,\nThe Hypatos Team",
+            emailPlaceholder: "Hi {{ '{{' }}user.first_name{{ '}}' }},\n\nWelcome to {{ '{{' }}organization.name{{ '}}' }}!\n\nHere are your access details:\n\n**Microsoft Teams:** {{ '{{' }}teams.name{{ '}}' }}\n**Slack channel:** {{ '{{' }}slack_client.channel_name{{ '}}' }}\n**Jira board:** {{ '{{' }}jira.board_url{{ '}}' }}\n**Metabase:** {{ '{{' }}metabase.name{{ '}}' }}\n\n**Documentation links:**\n{{ '{{' }}#documentation_links{{ '}}' }}- [{{ '{{' }}link.title{{ '}}' }}]({{ '{{' }}link.url{{ '}}' }}) — {{ '{{' }}link.description{{ '}}' }}\n{{ '{{' }}/documentation_links{{ '}}' }}\n\nBest regards,\nThe Hypatos Team",
 
             emailVariableGroups: [
                 {
