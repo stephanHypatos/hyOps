@@ -227,7 +227,7 @@ class Organization(SQLModel, table=True):
     )
     projects: list["Project"] = Relationship(
         back_populates="customer",
-        sa_relationship_kwargs={"lazy": "selectin", "cascade": "all, delete-orphan"},
+        sa_relationship_kwargs={"lazy": "selectin", "cascade": "all, delete-orphan", "foreign_keys": "[Project.customer_id]"},
     )
     teams_groups: list["OrganizationTeamsGroup"] = Relationship(
         back_populates="organization",
