@@ -158,9 +158,9 @@ async def create_teams_team_for_org(org_id: UUID, session: SessionDep):
     await session.refresh(org_group)
 
     return {
-        "teams_team_id": result_data["id"],
-        "teams_team_name": result_data["name"],
-        "created": result_data["created"],
+        "teams_team_id": org_group.external_id,
+        "teams_team_name": org_group.name,
+        "created": result_data.get("created", True),
     }
 
 

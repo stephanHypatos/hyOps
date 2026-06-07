@@ -558,7 +558,7 @@
                     const data = await r.json();
                     if (r.ok) {
                         this.teamsOk = true;
-                        this.teamsMsg = `✓ Team '${data.teams_team_name}' created (ID: ${data.teams_team_id}). Add users manually via the 🔗 button on the Users page.`;
+                        this.teamsMsg = `✓ Team '${data.teams_team_name}' created and linked (ID: ${data.teams_team_id})`;
                         this.teams.external_id = data.teams_team_id;
                         this.teams.name = data.teams_team_name;
                         window.integrationsApp && window.integrationsApp.reload();
