@@ -134,6 +134,105 @@
                 </div>
             </div>
         </div>
+
+        <!-- ── Admin Panel ──────────────────────────────────────────────── -->
+        <div class="card shadow-sm mt-4">
+            <div class="card-header bg-white">
+                <button class="btn btn-link text-decoration-none p-0 fw-semibold text-dark"
+                        data-bs-toggle="collapse" data-bs-target="#adminPanel">
+                    🛠 Microsoft Teams Admin Operations
+                    <span class="text-muted small ms-2">(list teams, list users, delete)</span>
+                </button>
+            </div>
+            <div class="collapse" id="adminPanel">
+                <div class="card-body">
+                    <div class="row g-4">
+
+                        <!-- All Teams -->
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <h6 class="mb-0 fw-semibold">All Teams in Tenant</h6>
+                                <button class="btn btn-sm btn-outline-primary"
+                                        :disabled="admin.loadingTeams"
+                                        @click="loadAllTeams()">
+                                    <span x-show="!admin.loadingTeams">🔍 Load</span>
+                                    <span x-show="admin.loadingTeams">Loading…</span>
+                                </button>
+                            </div>
+                            <div x-show="admin.teamsError" class="small text-danger mb-1" x-text="admin.teamsError"></div>
+                            <div x-show="admin.allTeams.length > 0" class="table-responsive" style="max-height:300px;overflow-y:auto;">
+                                <table class="table table-sm table-bordered mb-0" style="font-size:0.82rem;">
+                                    <thead class="table-light sticky-top">
+                                        <tr><th>Name</th><th>ID</th><th>Action</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="t in admin.allTeams" :key="t.id">
+                                            <tr :id="'admin-team-' + t.id">
+                                                <td x-text="t.name"></td>
+                                                <td class="text-muted" style="font-size:0.75rem;" x-text="t.id"></td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-danger"
+                                                            @click="deleteTeam(t.id, t.name)">
+                                                        Delete
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div x-show="admin.teamsLoaded && admin.allTeams.length === 0" class="small text-muted">No teams found.</div>
+                        </div>
+
+                        <!-- All Azure AD Users -->
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <h6 class="mb-0 fw-semibold">All Azure AD Users</h6>
+                                <button class="btn btn-sm btn-outline-primary"
+                                        :disabled="admin.loadingUsers"
+                                        @click="loadAllADUsers()">
+                                    <span x-show="!admin.loadingUsers">🔍 Load</span>
+                                    <span x-show="admin.loadingUsers">Loading…</span>
+                                </button>
+                            </div>
+                            <div class="mb-2" x-show="admin.allUsers.length > 0">
+                                <input type="text" class="form-control form-control-sm"
+                                       placeholder="Filter by name or email…"
+                                       x-model="admin.userFilter">
+                            </div>
+                            <div x-show="admin.usersError" class="small text-danger mb-1" x-text="admin.usersError"></div>
+                            <div x-show="admin.allUsers.length > 0" class="table-responsive" style="max-height:300px;overflow-y:auto;">
+                                <table class="table table-sm table-bordered mb-0" style="font-size:0.82rem;">
+                                    <thead class="table-light sticky-top">
+                                        <tr><th>Name</th><th>Email</th><th>Action</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="u in filteredADUsers()" :key="u.id">
+                                            <tr :id="'admin-user-' + u.id">
+                                                <td x-text="u.display_name || '—'"></td>
+                                                <td class="text-muted" x-text="u.email"></td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-danger"
+                                                            @click="deleteADUser(u.id, u.display_name || u.email)">
+                                                        Delete
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div x-show="admin.usersLoaded && admin.allUsers.length === 0" class="small text-muted">No users found.</div>
+                        </div>
+
+                    </div>
+                    <div x-show="admin.actionMsg" class="mt-3 small"
+                         :class="admin.actionOk ? 'text-success' : 'text-danger'"
+                         x-text="admin.actionMsg"></div>
+                </div>
+            </div>
+        </div>
+
     </main>
 </div>
 
@@ -216,30 +315,118 @@
 
                 <!-- Teams -->
                 <div class="mb-4 p-3 border rounded">
-                    <h6 class="fw-bold mb-3">💬 Microsoft Teams</h6>
-                    <div class="row g-3">
-                        <div class="col-md-5">
-                            <label class="form-label">Team ID <small class="text-muted">(Microsoft 365 Group ID)</small></label>
-                            <input type="text" class="form-control" placeholder="e.g. xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                                   x-model="$store.modal.teams.external_id">
-                        </div>
-                        <div class="col-md-5">
-                            <label class="form-label">Team Name</label>
-                            <input type="text" class="form-control" placeholder="e.g. ext-acme"
-                                   x-model="$store.modal.teams.name">
-                        </div>
-                        <div class="col-md-2 d-flex align-items-end">
-                            <button class="btn btn-primary w-100"
+                    <h6 class="fw-bold mb-2">💬 Microsoft Teams</h6>
+
+                    <!-- Current status -->
+                    <div class="mb-3 d-flex align-items-center gap-2">
+                        <template x-if="$store.modal.teams.external_id">
+                            <span class="badge" style="background:#dbeafe;color:#1e40af;font-size:0.8rem;">
+                                ✓ Linked to team: <strong x-text="$store.modal.teams.name"></strong>
+                                (ID: <span x-text="$store.modal.teams.external_id"></span>)
+                            </span>
+                        </template>
+                        <template x-if="!$store.modal.teams.external_id">
+                            <span class="badge bg-light text-muted" style="font-size:0.8rem;">Not configured</span>
+                        </template>
+                        <template x-if="$store.modal.teams.external_id">
+                            <button class="btn btn-sm btn-outline-danger"
                                     :disabled="$store.modal.saving"
-                                    @click="$store.modal.saveTeams()">
-                                <span x-show="!$store.modal.saving">Save</span>
-                                <span x-show="$store.modal.saving">…</span>
+                                    @click="$store.modal.unlinkTeams()">
+                                Unlink
                             </button>
+                        </template>
+                        <template x-if="$store.modal.teams.external_id">
+                            <button class="btn btn-sm btn-outline-secondary"
+                                    :disabled="$store.modal.teamsLoadingMembers"
+                                    @click="$store.modal.loadTeamsMembers()">
+                                <span x-show="!$store.modal.teamsLoadingMembers">👥 View Members</span>
+                                <span x-show="$store.modal.teamsLoadingMembers">Loading…</span>
+                            </button>
+                        </template>
+                    </div>
+
+                    <!-- Option A: Create new team -->
+                    <div class="mb-3 p-2 bg-light rounded">
+                        <p class="mb-2 small fw-semibold">Option A — Create a new Teams team for this org</p>
+                        <p class="mb-2 small text-muted">
+                            Uses the organization name as the team display name. Checks for duplicates first.
+                            Admin owner (Stephan) is added automatically. Provisions all existing org users.
+                        </p>
+                        <button class="btn btn-sm btn-primary"
+                                :disabled="$store.modal.saving"
+                                @click="$store.modal.createTeamsTeam()">
+                            <span x-show="!$store.modal.saving">🚀 Create team in Microsoft Teams</span>
+                            <span x-show="$store.modal.saving">Creating… (may take ~30s)</span>
+                        </button>
+                    </div>
+
+                    <!-- Option B: Link existing team -->
+                    <div class="p-2 bg-light rounded">
+                        <p class="mb-2 small fw-semibold">Option B — Link an existing Teams team</p>
+                        <div class="row g-2">
+                            <div class="col-md-5">
+                                <input type="text" class="form-control form-control-sm"
+                                       placeholder="Team ID (Microsoft 365 Group ID)"
+                                       x-model="$store.modal.teams.external_id">
+                            </div>
+                            <div class="col-md-5">
+                                <input type="text" class="form-control form-control-sm"
+                                       placeholder="Team display name"
+                                       x-model="$store.modal.teams.name">
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn btn-sm btn-outline-primary w-100"
+                                        :disabled="$store.modal.saving"
+                                        @click="$store.modal.saveTeams()">
+                                    <span x-show="!$store.modal.saving">Link</span>
+                                    <span x-show="$store.modal.saving">…</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
+
                     <div x-show="$store.modal.teamsMsg" class="mt-2 small"
                          :class="$store.modal.teamsOk ? 'text-success' : 'text-danger'"
                          x-text="$store.modal.teamsMsg"></div>
+
+                    <!-- Members table -->
+                    <div x-show="$store.modal.teamsMembers.length > 0" class="mt-3">
+                        <p class="small fw-semibold mb-1 text-muted">Current Team Members</p>
+                        <table class="table table-sm table-bordered mb-0" style="font-size:0.82rem;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th style="width:90px;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="m in $store.modal.teamsMembers" :key="m.membership_id">
+                                    <tr :id="'teams-row-' + m.membership_id">
+                                        <td x-text="m.display_name || '—'"></td>
+                                        <td x-text="m.email || '—'"></td>
+                                        <td>
+                                            <span x-text="m.roles && m.roles.length ? m.roles.join(', ') : 'member'"
+                                                  class="badge"
+                                                  :class="m.roles && m.roles.includes('owner') ? 'bg-warning text-dark' : 'bg-light text-dark'">
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-danger"
+                                                    :disabled="$store.modal.saving"
+                                                    @click="$store.modal.removeTeamsMember(m.membership_id)">
+                                                Remove
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div x-show="$store.modal.teamsMembersLoaded && $store.modal.teamsMembers.length === 0" class="mt-2 small text-muted">
+                        No members found in this team.
+                    </div>
                 </div>
 
                 <!-- Slack -->
@@ -287,13 +474,20 @@
             orgId: null,
             orgName: '',
             saving: false,
+
             metabase: { external_id: '', name: '' },
             metabaseMsg: '', metabaseOk: true,
-            teams:    { external_id: '', name: '' },
+
+            teams: { external_id: '', name: '' },
             teamsMsg: '', teamsOk: true,
-            slack:    { external_id: '', channel_name: '' },
+            teamsMembers: [],
+            teamsLoadingMembers: false,
+            teamsMembersLoaded: false,
+
+            slack: { external_id: '', channel_name: '' },
             slackMsg: '', slackOk: true,
 
+            // ── Metabase ──────────────────────────────────────────────────────
             async unlinkMetabase() {
                 if (!confirm('Unlink this Metabase group from the organization?\n\nThis removes the connection in hyOps but does NOT delete the group in Metabase.')) return;
                 this.saving = true; this.metabaseMsg = '';
@@ -316,9 +510,7 @@
             async createMetabaseGroup() {
                 this.saving = true; this.metabaseMsg = '';
                 try {
-                    const r = await fetch(`/metabase/organization/${this.orgId}/create-group`, {
-                        method: 'POST'
-                    });
+                    const r = await fetch(`/metabase/organization/${this.orgId}/create-group`, { method: 'POST' });
                     const data = await r.json();
                     if (r.ok) {
                         this.metabaseOk = true;
@@ -357,6 +549,55 @@
                 finally { this.saving = false; }
             },
 
+            // ── Teams ─────────────────────────────────────────────────────────
+            async createTeamsTeam() {
+                this.saving = true; this.teamsMsg = '⏳ Creating team… (this may take up to 30s)';
+                this.teamsOk = true;
+                try {
+                    const r = await fetch(`/teams/organization/${this.orgId}/create-team`, { method: 'POST' });
+                    const data = await r.json();
+                    if (r.ok) {
+                        this.teamsOk = true;
+                        const provisioned = data.users_provisioned || [];
+                        this.teamsMsg = provisioned.length > 0
+                            ? `✓ Team '${data.teams_team_name}' created and ${provisioned.length} user(s) added`
+                            : `✓ Team '${data.teams_team_name}' created (ID: ${data.teams_team_id})`;
+                        this.teams.external_id = data.teams_team_id;
+                        this.teams.name = data.teams_team_name;
+                        window.integrationsApp && window.integrationsApp.reload();
+                    } else if (r.status === 409) {
+                        this.teamsOk = false;
+                        const detail = data.detail || {};
+                        this.teamsMsg = `✗ ${detail.message || 'Team already exists'} — use Option B to link it (ID: ${detail.existing_team_id || '?'})`;
+                    } else {
+                        this.teamsOk = false;
+                        this.teamsMsg = '✗ ' + (typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail) || 'Error');
+                    }
+                } catch(e) { this.teamsOk = false; this.teamsMsg = '✗ Network error'; }
+                finally { this.saving = false; }
+            },
+
+            async unlinkTeams() {
+                if (!confirm('Unlink this Teams team from the organization?\n\nThis removes the connection in hyOps but does NOT delete the team in Microsoft Teams.')) return;
+                this.saving = true; this.teamsMsg = '';
+                try {
+                    const r = await fetch(`/teams/organization/${this.orgId}/group`, { method: 'DELETE' });
+                    const data = await r.json();
+                    if (r.ok) {
+                        this.teamsOk = true;
+                        this.teamsMsg = '✓ Unlinked successfully';
+                        this.teams = { external_id: '', name: '' };
+                        this.teamsMembers = [];
+                        this.teamsMembersLoaded = false;
+                        window.integrationsApp && window.integrationsApp.reload();
+                    } else {
+                        this.teamsOk = false;
+                        this.teamsMsg = '✗ ' + (data.detail || 'Error unlinking');
+                    }
+                } catch(e) { this.teamsOk = false; this.teamsMsg = '✗ Network error'; }
+                finally { this.saving = false; }
+            },
+
             async saveTeams() {
                 this.saving = true; this.teamsMsg = '';
                 try {
@@ -367,12 +608,49 @@
                     });
                     const data = await r.json();
                     this.teamsOk = r.ok;
-                    this.teamsMsg = r.ok ? '✓ Saved' : (data.detail || 'Error saving');
+                    this.teamsMsg = r.ok ? '✓ Team linked' : (data.detail || 'Error saving');
                     if (r.ok) window.integrationsApp && window.integrationsApp.reload();
-                } catch(e) { this.teamsOk = false; this.teamsMsg = 'Network error'; }
+                } catch(e) { this.teamsOk = false; this.teamsMsg = '✗ Network error'; }
                 finally { this.saving = false; }
             },
 
+            async loadTeamsMembers() {
+                this.teamsLoadingMembers = true; this.teamsMsg = '';
+                try {
+                    const r = await fetch(`/teams/organization/${this.orgId}/members`);
+                    if (r.ok) {
+                        const data = await r.json();
+                        this.teamsMembers = data.members || [];
+                        this.teamsMembersLoaded = true;
+                    } else {
+                        const data = await r.json();
+                        this.teamsOk = false;
+                        this.teamsMsg = '✗ ' + (data.detail || 'Could not load members');
+                    }
+                } catch(e) { this.teamsOk = false; this.teamsMsg = '✗ Network error loading members'; }
+                finally { this.teamsLoadingMembers = false; }
+            },
+
+            async removeTeamsMember(membershipId) {
+                if (!confirm('Remove this member from the Teams team?')) return;
+                this.saving = true; this.teamsMsg = '';
+                try {
+                    const r = await fetch(`/teams/organization/${this.orgId}/members/${membershipId}`, { method: 'DELETE' });
+                    const data = await r.json();
+                    if (r.ok) {
+                        // Remove row from list
+                        this.teamsMembers = this.teamsMembers.filter(m => m.membership_id !== membershipId);
+                        this.teamsOk = true;
+                        this.teamsMsg = '✓ Member removed from team';
+                    } else {
+                        this.teamsOk = false;
+                        this.teamsMsg = '✗ ' + (data.detail || 'Error removing member');
+                    }
+                } catch(e) { this.teamsOk = false; this.teamsMsg = '✗ Network error'; }
+                finally { this.saving = false; }
+            },
+
+            // ── Slack ─────────────────────────────────────────────────────────
             async saveSlack() {
                 this.saving = true; this.slackMsg = '';
                 try {
@@ -385,7 +663,7 @@
                     this.slackOk = r.ok;
                     this.slackMsg = r.ok ? '✓ Saved' : (data.detail || 'Error saving');
                     if (r.ok) window.integrationsApp && window.integrationsApp.reload();
-                } catch(e) { this.slackOk = false; this.slackMsg = 'Network error'; }
+                } catch(e) { this.slackOk = false; this.slackMsg = '✗ Network error'; }
                 finally { this.saving = false; }
             }
         });
@@ -397,6 +675,14 @@
             loading: true,
             banner: { show: false, ok: true, msg: '' },
             _modal: null,
+
+            // Admin panel state
+            admin: {
+                allTeams: [], loadingTeams: false, teamsLoaded: false, teamsError: '',
+                allUsers: [], loadingUsers: false, usersLoaded: false, usersError: '',
+                userFilter: '',
+                actionMsg: '', actionOk: true,
+            },
 
             async init() {
                 window.integrationsApp = this;
@@ -433,6 +719,83 @@
 
             reload() { this.fetchOrgs(); },
 
+            // ── Admin: Teams ──────────────────────────────────────────────
+            async loadAllTeams() {
+                this.admin.loadingTeams = true; this.admin.teamsError = '';
+                try {
+                    const r = await fetch('/teams/teams');
+                    if (r.ok) {
+                        this.admin.allTeams = await r.json();
+                        this.admin.teamsLoaded = true;
+                    } else {
+                        const d = await r.json();
+                        this.admin.teamsError = d.detail || 'Error loading teams';
+                    }
+                } catch(e) { this.admin.teamsError = 'Network error'; }
+                finally { this.admin.loadingTeams = false; }
+            },
+
+            async deleteTeam(teamId, teamName) {
+                if (!confirm(`⚠️ Permanently DELETE the Teams team "${teamName}" from Microsoft Teams?\n\nThis cannot be undone.`)) return;
+                this.admin.actionMsg = ''; this.admin.actionOk = true;
+                try {
+                    // First unlink from any orgs in our DB
+                    const r = await fetch(`/teams/teams/${teamId}`, { method: 'DELETE' });
+                    if (r.ok) {
+                        this.admin.allTeams = this.admin.allTeams.filter(t => t.id !== teamId);
+                        this.admin.actionOk = true;
+                        this.admin.actionMsg = `✓ Team "${teamName}" deleted`;
+                        this.reload();
+                    } else {
+                        const d = await r.json();
+                        this.admin.actionOk = false;
+                        this.admin.actionMsg = '✗ ' + (d.detail || 'Error deleting team');
+                    }
+                } catch(e) { this.admin.actionOk = false; this.admin.actionMsg = '✗ Network error'; }
+            },
+
+            // ── Admin: Users ──────────────────────────────────────────────
+            async loadAllADUsers() {
+                this.admin.loadingUsers = true; this.admin.usersError = '';
+                try {
+                    const r = await fetch('/teams/users');
+                    if (r.ok) {
+                        this.admin.allUsers = await r.json();
+                        this.admin.usersLoaded = true;
+                    } else {
+                        const d = await r.json();
+                        this.admin.usersError = d.detail || 'Error loading users';
+                    }
+                } catch(e) { this.admin.usersError = 'Network error'; }
+                finally { this.admin.loadingUsers = false; }
+            },
+
+            filteredADUsers() {
+                const f = this.admin.userFilter.toLowerCase();
+                if (!f) return this.admin.allUsers;
+                return this.admin.allUsers.filter(u =>
+                    (u.display_name || '').toLowerCase().includes(f) ||
+                    (u.email || '').toLowerCase().includes(f)
+                );
+            },
+
+            async deleteADUser(userId, label) {
+                if (!confirm(`⚠️ Permanently DELETE Azure AD user "${label}"?\n\nThis removes them from Azure AD entirely.`)) return;
+                this.admin.actionMsg = ''; this.admin.actionOk = true;
+                try {
+                    const r = await fetch(`/teams/users/${userId}`, { method: 'DELETE' });
+                    if (r.ok) {
+                        this.admin.allUsers = this.admin.allUsers.filter(u => u.id !== userId);
+                        this.admin.actionOk = true;
+                        this.admin.actionMsg = `✓ User "${label}" deleted from Azure AD`;
+                    } else {
+                        const d = await r.json();
+                        this.admin.actionOk = false;
+                        this.admin.actionMsg = '✗ ' + (d.detail || 'Error deleting user');
+                    }
+                } catch(e) { this.admin.actionOk = false; this.admin.actionMsg = '✗ Network error'; }
+            },
+
             openModal(org) {
                 const s = Alpine.store('modal');
                 s.orgId   = org.id;
@@ -446,7 +809,11 @@
                 s.slack = org._slack
                     ? { external_id: org._slack.external_id, channel_name: org._slack.channel_name }
                     : { external_id: '', channel_name: '' };
-                s.metabaseMsg = ''; s.teamsMsg = ''; s.slackMsg = '';
+                // Reset message + members state
+                s.metabaseMsg = ''; s.metabaseOk = true;
+                s.teamsMsg = ''; s.teamsOk = true;
+                s.teamsMembers = []; s.teamsMembersLoaded = false; s.teamsLoadingMembers = false;
+                s.slackMsg = ''; s.slackOk = true;
                 this._modal.show();
             }
         }

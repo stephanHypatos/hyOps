@@ -309,7 +309,8 @@ class User(SQLModel, table=True):
     last_name: str
     email: EmailStr
     phone: str
-    metabase_user_id: Optional[int] = Field(default=None)  # cached Metabase internal user ID
+    metabase_user_id: Optional[int] = Field(default=None)   # cached Metabase internal user ID
+    teams_user_id: Optional[str] = Field(default=None)      # Azure AD object ID (cached after first provisioning)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 

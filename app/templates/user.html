@@ -193,8 +193,9 @@
                 </div>
                 <!-- Teams -->
                 <div class="mb-4 p-3 border rounded">
-                    <h6 class="fw-bold mb-3">💬 Microsoft Teams</h6>
-                    <div id="teamsStatus" class="mb-2 small text-muted">—</div>
+                    <h6 class="fw-bold mb-2">💬 Microsoft Teams</h6>
+                    <div id="teamsStatus" class="mb-2 small"></div>
+                    <div id="teamsMembership" class="mb-3"></div>
                     <button class="btn btn-sm btn-primary" id="btnAddTeams">Add to Teams</button>
                     <div id="teamsActionMsg" class="mt-2 small"></div>
                 </div>
@@ -392,11 +393,15 @@
                 const slackStatus   = document.getElementById('slackStatus');
                 const slackMsg      = document.getElementById('slackActionMsg');
 
+                const teamsMembership = document.getElementById('teamsMembership');
+
                 // Reset
                 mbStatus.innerHTML = '<span class="text-muted">Loading…</span>';
                 mbMemberships.innerHTML = '';
                 mbMsg.textContent = '';
-                teamsStatus.textContent = '—'; teamsMsg.textContent = '';
+                teamsStatus.innerHTML = '<span class="text-muted">Loading…</span>';
+                teamsMembership.innerHTML = '';
+                teamsMsg.textContent = '';
                 slackStatus.textContent = '—'; slackMsg.textContent = '';
 
                 // Always fetch live membership state from the API
@@ -465,7 +470,61 @@
                     btnMb.disabled = false; btnMb.textContent = 'Provision to Metabase';
                 };
 
-                // Teams button
+                // ── Teams: live membership load ──────────────────────────────
+                const loadTeamsMembership = () => {
+                    teamsStatus.innerHTML = '<span class="text-muted small">Loading…</span>';
+                    teamsMembership.innerHTML = '';
+                    fetch(`/teams/user/${user.id}/membership`)
+                        .then(async r => {
+                            if (!r.ok) {
+                                const d = await r.json().catch(() => ({}));
+                                teamsStatus.innerHTML = `<span class="text-danger small">✗ ${d.detail || 'Error loading status'}</span>`;
+                                return;
+                            }
+                            const data = await r.json();
+                            if (!data.org_team) {
+                                teamsStatus.innerHTML = '<span class="text-muted small">No Teams team configured for this organization.</span>';
+                                return;
+                            }
+                            if (!data.teams_user_id) {
+                                teamsStatus.innerHTML = `<span class="text-muted small">Not provisioned — org team: <strong>${data.org_team.name}</strong></span>`;
+                                return;
+                            }
+                            teamsStatus.innerHTML = `<span class="text-success small">✓ Provisioned (Azure AD ID: ${data.teams_user_id.substring(0,8)}…)</span>`;
+                            if (data.in_team && data.membership) {
+                                const m = data.membership;
+                                const roleLabel = m.roles && m.roles.length ? m.roles.join(', ') : 'member';
+                                teamsMembership.innerHTML = `
+                                    <p class="small fw-semibold mb-1 text-muted">Team membership</p>
+                                    <table class="table table-sm table-bordered mb-0" style="font-size:0.85rem;">
+                                        <thead class="table-light">
+                                            <tr><th>Team</th><th>Role</th><th style="width:90px;">Action</th></tr>
+                                        </thead>
+                                        <tbody id="teams-membership-body">
+                                            <tr id="teams-row-${m.membership_id}">
+                                                <td>${data.org_team.name}</td>
+                                                <td><span class="badge ${roleLabel.includes('owner') ? 'bg-warning text-dark' : 'bg-light text-dark'}">${roleLabel}</span></td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-danger"
+                                                        onclick="removeFromTeam('${user.id}', this)">
+                                                        Remove
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>`;
+                            } else {
+                                teamsMembership.innerHTML = '<p class="small text-muted mb-0">Provisioned but not currently in the team.</p>';
+                            }
+                        })
+                        .catch(() => {
+                            teamsStatus.innerHTML = '<span class="text-muted small">Could not load Teams status.</span>';
+                        });
+                };
+
+                loadTeamsMembership();
+
+                // Teams add button
                 const btnTeams = document.getElementById('btnAddTeams');
                 btnTeams.onclick = async () => {
                     btnTeams.disabled = true; btnTeams.textContent = 'Adding…';
@@ -474,12 +533,14 @@
                         const r = await fetch(`/teams/user/${user.id}/add`, { method: 'POST' });
                         const data = await r.json();
                         if (r.ok) {
-                            teamsMsg.textContent = `✓ Added to ${data.teams_group}`;
+                            const invited = data.teams_guest_invited ? ' (invitation sent)' : '';
+                            teamsMsg.textContent = `✓ Added to ${data.teams_group}${invited}`;
                             teamsMsg.className = 'mt-2 small text-success';
-                            teamsStatus.textContent = `✓ Member of ${data.teams_group}`;
-                            teamsStatus.className = 'mb-2 small text-success';
+                            loadTeamsMembership();  // refresh live
+                            await this.fetchUsers();
                         } else {
-                            teamsMsg.textContent = '✗ ' + (data.detail || 'Error');
+                            const detail = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+                            teamsMsg.textContent = '✗ ' + (detail || 'Error');
                             teamsMsg.className = 'mt-2 small text-danger';
                         }
                     } catch(e) { teamsMsg.textContent = '✗ Network error'; teamsMsg.className = 'mt-2 small text-danger'; }
@@ -524,6 +585,33 @@
 </script>
 
 <script>
+    async function removeFromTeam(userId, btn) {
+        if (!confirm('Remove this user from their Microsoft Teams team?')) return;
+        btn.disabled = true;
+        btn.textContent = 'Removing…';
+        try {
+            const r = await fetch(`/teams/user/${userId}/remove`, { method: 'DELETE' });
+            if (r.ok) {
+                const row = btn.closest('tr');
+                if (row) row.remove();
+                const tbody = document.getElementById('teams-membership-body');
+                if (tbody && tbody.children.length === 0) {
+                    document.getElementById('teamsMembership').innerHTML =
+                        '<p class="small text-muted mb-0">No active team memberships.</p>';
+                }
+            } else {
+                const data = await r.json().catch(() => ({}));
+                alert('Failed to remove: ' + (data.detail || 'Unknown error'));
+                btn.disabled = false;
+                btn.textContent = 'Remove';
+            }
+        } catch(e) {
+            alert('Network error');
+            btn.disabled = false;
+            btn.textContent = 'Remove';
+        }
+    }
+
     async function removeFromMbGroup(userId, groupId, btn) {
         if (!confirm('Remove this user from the Metabase group?')) return;
         btn.disabled = true;

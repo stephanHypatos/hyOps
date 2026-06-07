@@ -25,7 +25,8 @@ class IntegrationSettings(BaseSettings):
     AZURE_TENANT_ID: Optional[str] = None
     AZURE_CLIENT_ID: Optional[str] = None
     AZURE_CLIENT_SECRET: Optional[str] = None
-    TEAMS_TEAM_ID: Optional[str] = None
+    TEAMS_TEAM_ID: Optional[str] = None  # legacy — per-org teams now stored in DB
+    TEAMS_ADMIN_USER_ID: str = "02f15082-7848-48ac-830f-3af9db319dee"  # Stephan power-admin
 
     # Email (SMTP)
     SMTP_HOST: Optional[str] = None
