@@ -89,6 +89,7 @@ class DocumentTemplateType(str, Enum):
     sow = "sow"
     success_contract = "success_contract"
     solution_design = "solution_design"
+    email = "email"
     other = "other"
 
 

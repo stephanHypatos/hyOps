@@ -158,10 +158,11 @@
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Type</label>
-                            <select class="form-select" x-model="form.type" required>
+                            <select class="form-select" x-model="form.type" required @change="onTypeChange()">
                                 <option value="sow">SOW</option>
                                 <option value="success_contract">Success Contract</option>
                                 <option value="solution_design">Solution Design</option>
+                                <option value="email">✉️ Email (User Onboarding)</option>
                                 <option value="other">Other</option>
                             </select>
                         </div>
@@ -180,12 +181,16 @@
                                 </template>
                             </select>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-2" x-show="form.type !== 'email'">
                             <label class="form-label">File Format</label>
-                            <select class="form-select" x-model="form.file_format" required>
+                            <select class="form-select" x-model="form.file_format" :required="form.type !== 'email'">
                                 <option value="md">Markdown (.md)</option>
                                 <option value="docx">Word (.docx)</option>
                             </select>
+                        </div>
+                        <div class="col-md-2" x-show="form.type === 'email'">
+                            <label class="form-label">File Format</label>
+                            <input type="text" class="form-control" value="HTML (email)" disabled>
                         </div>
                     </div>
 
@@ -204,7 +209,7 @@
                                         <i class="bi bi-x remove-var" @click.stop="removeVariable(varName)"></i>
                                     </span>
                                 </template>
-                                <span x-show="form.variables.length === 0" class="var-empty-msg">Click to select project variables...</span>
+                                <span x-show="form.variables.length === 0" class="var-empty-msg" x-text="form.type === 'email' ? 'Click to select email variables...' : 'Click to select project variables...'"></span>
                             </div>
 
                             <div class="var-selector" @click.outside="closeVarDropdown()">
@@ -241,19 +246,20 @@
                                 </div>
                             </div>
 
-                            <div class="form-text">Select project fields to use as template variables. Use <code>&#123;&#123;name&#125;&#125;</code> syntax in your markdown content.</div>
+                            <div class="form-text" x-show="form.type !== 'email'">Select project fields to use as template variables. Use <code>&#123;&#123;project.name&#125;&#125;</code> syntax in your content.</div>
+                            <div class="form-text" x-show="form.type === 'email'">Select user/integration variables. Use <code>&#123;&#123;user.first_name&#125;&#125;</code> syntax. For lists use <code>&#123;&#123;#documentation_links&#125;&#125;...&#123;&#123;/documentation_links&#125;&#125;</code>.</div>
                         </div>
                     </div>
 
                     <div class="row g-3 mb-3">
                         <div class="col-12">
                             <label class="form-label">Markdown Content</label>
-                            <textarea 
-                                class="form-control font-monospace" 
-                                x-model="form.markdown_content" 
-                                rows="10" 
-                                required 
-                                placeholder="# SOW for &#123;&#123;name&#125;&#125;&#10;&#10;Customer: &#123;&#123;customer_name&#125;&#125;&#10;Start Date: &#123;&#123;start_date&#125;&#125;&#10;Go-Live: &#123;&#123;go_live_date&#125;&#125;"></textarea>
+                            <textarea
+                                class="form-control font-monospace"
+                                x-model="form.markdown_content"
+                                rows="12"
+                                required
+                                :placeholder="form.type === 'email' ? emailPlaceholder : projectPlaceholder"></textarea>
                         </div>
                     </div>
 
@@ -315,8 +321,11 @@
                                         <span class="badge" :class="tmpl.is_active ? 'bg-success' : 'bg-secondary'" x-text="tmpl.is_active ? 'Active' : 'Inactive'"></span>
                                     </td>
                                     <td>
-                                        <button class="btn btn-sm btn-outline-warning" @click="editTemplate(tmpl)">Edit</button>
-                                        <button class="btn btn-sm btn-outline-danger" @click="deleteTemplate(tmpl)">Delete</button>
+                                        <button class="btn btn-sm btn-outline-warning me-1" @click="editTemplate(tmpl)">Edit</button>
+                                        <button class="btn btn-sm btn-outline-danger me-1" @click="deleteTemplate(tmpl)">Delete</button>
+                                        <button x-show="tmpl.type === 'email'" class="btn btn-sm btn-outline-primary" @click="openPreview(tmpl)" title="Preview for user">
+                                            <i class="bi bi-eye"></i>
+                                        </button>
                                     </td>
                                 </tr>
                             </template>
@@ -328,19 +337,182 @@
     </main>
 </div>
 
+<!-- Email Preview Modal -->
+<div class="modal fade" id="emailPreviewModal" tabindex="-1" x-data="emailPreviewManager()">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">✉️ Email Preview — <span x-text="previewTemplate?.name"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- User picker -->
+                <div class="row g-3 mb-4 align-items-end">
+                    <div class="col-md-5">
+                        <label class="form-label fw-semibold">Preview for User</label>
+                        <select class="form-select" x-model="selectedUserId">
+                            <option value="">Select a user...</option>
+                            <template x-for="u in allUsers" :key="u.id">
+                                <option :value="u.id" x-text="u.first_name + ' ' + u.last_name + ' (' + u.email + ')'"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div class="col-md-auto">
+                        <button class="btn btn-primary" @click="renderPreview()" :disabled="!selectedUserId || rendering">
+                            <span x-show="rendering" class="spinner-border spinner-border-sm me-1"></span>
+                            <i x-show="!rendering" class="bi bi-play-fill me-1"></i>
+                            <span x-text="rendering ? 'Rendering...' : 'Render'"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Two-panel: rendered | context -->
+                <div x-show="renderedContent" x-transition>
+                    <ul class="nav nav-tabs mb-3" id="previewTabs">
+                        <li class="nav-item"><a class="nav-link" :class="previewTab==='rendered'?'active':''" href="#" @click.prevent="previewTab='rendered'">📄 Rendered Output</a></li>
+                        <li class="nav-item"><a class="nav-link" :class="previewTab==='context'?'active':''" href="#" @click.prevent="previewTab='context'">🔍 Context Data</a></li>
+                    </ul>
+
+                    <!-- Rendered tab -->
+                    <div x-show="previewTab === 'rendered'">
+                        <div class="card bg-light border-0">
+                            <div class="card-body">
+                                <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit; font-size: 0.9rem;" x-text="renderedContent"></pre>
+                            </div>
+                        </div>
+                        <div class="mt-2 d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-secondary" @click="copyToClipboard()">
+                                <i class="bi bi-clipboard me-1"></i>Copy to clipboard
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Context tab -->
+                    <div x-show="previewTab === 'context'">
+                        <p class="text-muted small mb-2">All values available in this template for the selected user:</p>
+                        <template x-for="[section, data] in Object.entries(renderContext || {})" :key="section">
+                            <div class="mb-3">
+                                <h6 class="text-uppercase text-muted fw-bold small mb-1" x-text="section"></h6>
+                                <template x-if="Array.isArray(data)">
+                                    <div>
+                                        <template x-for="(item, i) in data" :key="i">
+                                            <div class="d-flex gap-2 flex-wrap mb-1 ms-2">
+                                                <template x-for="[k,v] in Object.entries(item)" :key="k">
+                                                    <span class="badge bg-light text-dark border">
+                                                        <code x-text="section.slice(0,-1) + '.' + k"></code>
+                                                        <span class="text-muted ms-1" x-text="': ' + v"></span>
+                                                    </span>
+                                                </template>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                                <template x-if="!Array.isArray(data) && typeof data === 'object'">
+                                    <div class="d-flex gap-2 flex-wrap ms-2">
+                                        <template x-for="[k,v] in Object.entries(data)" :key="k">
+                                            <span class="badge bg-light text-dark border" x-show="v !== ''">
+                                                <code x-text="section + '.' + k"></code>
+                                                <span class="text-muted ms-1" x-text="': ' + v"></span>
+                                            </span>
+                                        </template>
+                                        <span x-show="Object.values(data).every(v => v === '')" class="text-muted small fst-italic">— not configured —</span>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div x-show="!renderedContent && !rendering" class="text-center text-muted py-4">
+                    <i class="bi bi-envelope fs-2 d-block mb-2"></i>
+                    Select a user and click Render to preview this email template.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <script>
     function documentTemplateManager() {
         return {
             templates: [], users: [], loading: true, isEditing: false,
-            form: { id: '', name: '', type: 'sow', markdown_content: '', variables: [], version: 1.0, is_active: true, file_format: 'md',  created_by_id: '' },
+            form: { id: '', name: '', type: 'sow', markdown_content: '', variables: [], version: 1.0, is_active: true, file_format: 'md', created_by_id: '' },
             varSearch: '',
             varDropdownOpen: false,
             error: '',
 
             apiBase: "/document-template",
             userApi: "/user",
+
+            projectPlaceholder: "# SOW for {{project.name}}\n\nCustomer: {{customer.name}}\nStart Date: {{project.start_date}}\nGo-Live: {{project.go_live_date}}",
+            emailPlaceholder: "Hi {{user.first_name}},\n\nWelcome to {{organization.name}}!\n\nHere are your access details:\n\n**Microsoft Teams:** {{teams.name}}\n**Slack channel:** {{slack_client.channel_name}}\n**Jira board:** {{jira.board_url}}\n**Metabase:** {{metabase.name}}\n\n**Documentation links:**\n{{#documentation_links}}- [{{link.title}}]({{link.url}}) — {{link.description}}\n{{/documentation_links}}\n\nBest regards,\nThe Hypatos Team",
+
+            emailVariableGroups: [
+                {
+                    label: '👤 User',
+                    items: [
+                        { key: 'user.first_name', label: 'First Name' },
+                        { key: 'user.last_name', label: 'Last Name' },
+                        { key: 'user.email', label: 'Email Address' },
+                        { key: 'user.type', label: 'User Type' },
+                        { key: 'user.role', label: 'User Role' },
+                    ]
+                },
+                {
+                    label: '🏢 Organisation',
+                    items: [
+                        { key: 'organization.name', label: 'Organisation Name' },
+                        { key: 'organization.industry', label: 'Industry' },
+                        { key: 'organization.country', label: 'Country' },
+                    ]
+                },
+                {
+                    label: '💼 Microsoft Teams',
+                    items: [
+                        { key: 'teams.name', label: 'Teams Group Name' },
+                        { key: 'teams.external_id', label: 'Teams Group ID' },
+                    ]
+                },
+                {
+                    label: '💬 Slack — Client Channel',
+                    items: [
+                        { key: 'slack_client.channel_name', label: 'Client Channel Name' },
+                        { key: 'slack_client.channel_id', label: 'Client Channel ID' },
+                    ]
+                },
+                {
+                    label: '💬 Slack — Partner Channel',
+                    items: [
+                        { key: 'slack_partner.channel_name', label: 'Partner Channel Name' },
+                        { key: 'slack_partner.channel_id', label: 'Partner Channel ID' },
+                    ]
+                },
+                {
+                    label: '🎯 Jira',
+                    items: [
+                        { key: 'jira.project_key', label: 'Jira Project Key' },
+                        { key: 'jira.project_name', label: 'Jira Project Name' },
+                        { key: 'jira.board_url', label: 'Jira Board URL' },
+                    ]
+                },
+                {
+                    label: '📊 Metabase',
+                    items: [
+                        { key: 'metabase.name', label: 'Metabase Group Name' },
+                        { key: 'metabase.external_id', label: 'Metabase Group ID' },
+                    ]
+                },
+                {
+                    label: '📎 Documentation Links (loop)',
+                    items: [
+                        { key: 'link.title', label: 'Link Title (inside loop)' },
+                        { key: 'link.url', label: 'Link URL (inside loop)' },
+                        { key: 'link.description', label: 'Link Description (inside loop)' },
+                    ]
+                },
+            ],
 
             projectVariableGroups: [
                 {
@@ -517,17 +689,32 @@
                 },
             ],
 
+            get activeVarGroups() {
+                return this.form.type === 'email' ? this.emailVariableGroups : this.projectVariableGroups;
+            },
+
             get filteredVarGroups() {
                 const search = this.varSearch.toLowerCase().trim();
-                if (!search) return this.projectVariableGroups;
-                
-                return this.projectVariableGroups.map(group => ({
+                if (!search) return this.activeVarGroups;
+                return this.activeVarGroups.map(group => ({
                     ...group,
-                    items: group.items.filter(item => 
-                        item.key.toLowerCase().includes(search) || 
+                    items: group.items.filter(item =>
+                        item.key.toLowerCase().includes(search) ||
                         item.label.toLowerCase().includes(search)
                     )
                 }));
+            },
+
+            onTypeChange() {
+                // When switching to email, preset format and clear variables
+                if (this.form.type === 'email') {
+                    this.form.file_format = 'html';
+                    this.form.variables = [];
+                } else if (this.form.file_format === 'html') {
+                    this.form.file_format = 'md';
+                }
+                this.form.variables = [];
+                this.varSearch = '';
             },
 
             isVariableSelected(key) {
@@ -654,15 +841,77 @@
                 return user ? `${user.first_name} ${user.last_name}` : id;
             },
 
+            openPreview(tmpl) {
+                // Dispatch to the emailPreviewManager via a custom event
+                window._previewTemplate = tmpl;
+                window._previewUsers = this.users;
+                const modal = new bootstrap.Modal(document.getElementById('emailPreviewModal'));
+                modal.show();
+            },
+
             getTypeBadgeColor(type) {
                 switch(type) {
                     case 'sow': return 'bg-primary';
                     case 'success_contract': return 'bg-success';
                     case 'solution_design': return 'bg-info';
+                    case 'email': return 'bg-warning text-dark';
                     default: return 'bg-secondary';
                 }
             }
         }
+    }
+
+    function emailPreviewManager() {
+        return {
+            previewTemplate: null,
+            allUsers: [],
+            selectedUserId: '',
+            rendering: false,
+            renderedContent: '',
+            renderContext: null,
+            previewTab: 'rendered',
+
+            init() {
+                // Grab template + users from the parent manager (set via openPreview)
+                const el = document.getElementById('emailPreviewModal');
+                el.addEventListener('show.bs.modal', () => {
+                    this.previewTemplate = window._previewTemplate || null;
+                    this.allUsers = window._previewUsers || [];
+                    this.selectedUserId = '';
+                    this.renderedContent = '';
+                    this.renderContext = null;
+                    this.previewTab = 'rendered';
+                });
+            },
+
+            async renderPreview() {
+                if (!this.selectedUserId || !this.previewTemplate) return;
+                this.rendering = true;
+                this.renderedContent = '';
+                this.renderContext = null;
+                try {
+                    const res = await fetch(`/document-template/${this.previewTemplate.id}/render-email`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ user_id: this.selectedUserId }),
+                    });
+                    if (!res.ok) { const e = await res.json(); throw new Error(e.detail || 'Error'); }
+                    const data = await res.json();
+                    this.renderedContent = data.rendered;
+                    this.renderContext = data.context;
+                } catch (e) {
+                    alert('Error rendering: ' + e.message);
+                } finally {
+                    this.rendering = false;
+                }
+            },
+
+            copyToClipboard() {
+                navigator.clipboard.writeText(this.renderedContent)
+                    .then(() => alert('Copied to clipboard!'))
+                    .catch(() => alert('Copy failed — please select and copy manually.'));
+            },
+        };
     }
 </script>
 </body>
