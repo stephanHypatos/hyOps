@@ -21,12 +21,13 @@ class ProjectBase(BaseModel):
     type: ProjectType
     start_date: date
     customer_id: UUID
+    partner_id: Optional[UUID] = None
     deal_winner_id: UUID
     default_duration_weeks: int
     requires_integration: bool
     integration_type: IntegrationType
-    partner_budget_hours: float
-    internal_budget_hours: float
+    partner_budget_hours: int = 0
+    internal_budget_hours: int = 0
     
     # Core Status
     status: ProjectStatus = ProjectStatus.draft
@@ -154,12 +155,13 @@ class ProjectUpdate(BaseModel):
     type: Optional[ProjectType] = None
     start_date: Optional[date] = None
     customer_id: Optional[UUID] = None
+    partner_id: Optional[UUID] = None
     deal_winner_id: Optional[UUID] = None
     default_duration_weeks: Optional[int] = None
     requires_integration: Optional[bool] = None
     integration_type: Optional[IntegrationType] = None
-    partner_budget_hours: Optional[float] = None
-    internal_budget_hours: Optional[float] = None
+    partner_budget_hours: Optional[int] = None
+    internal_budget_hours: Optional[int] = None
     
     status: Optional[ProjectStatus] = None
     primary_usecase_id: Optional[UUID] = None

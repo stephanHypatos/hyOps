@@ -79,9 +79,14 @@
                             <div class="col-md-3"><label class="form-label">Duration (Weeks)</label><input type="number" class="form-control" x-model="form.default_duration_weeks" required min="1"></div>
                         </div>
                         <div class="row g-3 mb-3">
-                            <div class="col-md-4"><label class="form-label">Customer</label><select class="form-select" x-model="form.customer_id" required><option value="" disabled>Select Customer...</option><template x-for="org in organizations" :key="org.id"><option :value="org.id" x-text="org.name"></option></template></select></div>
-                            <div class="col-md-4"><label class="form-label">Deal Winner</label><select class="form-select" x-model="form.deal_winner_id" required><option value="" disabled>Select User...</option><template x-for="u in users" :key="u.id"><option :value="u.id" x-text="u.first_name + ' ' + u.last_name"></option></template></select></div>
-                            <div class="col-md-4"><label class="form-label">Primary Usecase</label><select class="form-select" x-model="form.primary_usecase_id" @change="loadUsecaseFeatures(form.primary_usecase_id)"><option value="">None</option><template x-for="uc in usecases" :key="uc.id"><option :value="uc.id" x-text="uc.name"></option></template></select></div>
+                            <div class="col-md-3"><label class="form-label">Customer</label><select class="form-select" x-model="form.customer_id" required><option value="" disabled>Select Customer...</option><template x-for="org in organizations.filter(o => o.type === 'customer')" :key="org.id"><option :value="org.id" x-text="org.name"></option></template></select></div>
+                            <div class="col-md-3"><label class="form-label">Partner <span class="text-muted fw-normal">(optional)</span></label><select class="form-select" x-model="form.partner_id"><option value="">None</option><template x-for="org in organizations.filter(o => o.type === 'partner')" :key="org.id"><option :value="org.id" x-text="org.name"></option></template></select></div>
+                            <div class="col-md-3"><label class="form-label">Deal Winner</label><select class="form-select" x-model="form.deal_winner_id" required><option value="" disabled>Select User...</option><template x-for="u in users" :key="u.id"><option :value="u.id" x-text="u.first_name + ' ' + u.last_name"></option></template></select></div>
+                            <div class="col-md-3"><label class="form-label">Primary Usecase</label><select class="form-select" x-model="form.primary_usecase_id" @change="loadUsecaseFeatures(form.primary_usecase_id)"><option value="">None</option><template x-for="uc in usecases" :key="uc.id"><option :value="uc.id" x-text="uc.name"></option></template></select></div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6"><label class="form-label">Partner Budget (hrs)</label><input type="number" step="1" class="form-control" x-model.number="form.partner_budget_hours" min="0" placeholder="0"></div>
+                            <div class="col-md-6"><label class="form-label">Hypatos Budget (hrs)</label><input type="number" step="1" class="form-control" x-model.number="form.internal_budget_hours" min="0" placeholder="0"></div>
                         </div>
 
                         <!-- Usecase Features Display -->
@@ -146,8 +151,6 @@
                                 <div class="col-12"><label class="form-label">Existing Services</label><input type="text" class="form-control" x-model="form.existing_services"></div>
                                 <div class="col-12"><label class="form-label">Doc Receipt Channels</label><div class="d-flex flex-wrap gap-3"><template x-for="opt in ['Email','Portal','EDI','API','Manual Upload','Scan','Other']" :key="opt"><div class="form-check"><input class="form-check-input" type="checkbox" :checked="form.document_receipt_channels.includes(opt)" @change="toggleArrayItem(form.document_receipt_channels, opt)"><label class="form-check-label" x-text="opt"></label></div></template></div></div>
                                 <div class="col-12"><label class="form-label">Data Points</label><input type="text" class="form-control" x-model="form.data_points_current"></div>
-                                <div class="col-md-6"><label class="form-label">Partner Budget (hrs)</label><input type="number" step="0.5" class="form-control" x-model="form.partner_budget_hours" min="0"></div>
-                                <div class="col-md-6"><label class="form-label">Internal Budget (hrs)</label><input type="number" step="0.5" class="form-control" x-model="form.internal_budget_hours" min="0"></div>
                             </div></div></div>
 
                             <div class="accordion-item"><h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#docProcessing">Doc Processing Discovery</button></h2><div id="docProcessing" class="accordion-collapse collapse"><div class="accordion-body row g-3">
@@ -444,9 +447,9 @@
             selectedTemplateIds: [],
             generatedDocsList: [],
 
-            form: { 
-                id: '', name: '', type: 'pilot', status: 'draft', start_date: '', customer_id: '', deal_winner_id: '', primary_usecase_id: '',
-                default_duration_weeks: 4, requires_integration: 'false', integration_type: 'none', 
+            form: {
+                id: '', name: '', type: 'pilot', status: 'draft', start_date: '', customer_id: '', partner_id: '', deal_winner_id: '', primary_usecase_id: '',
+                default_duration_weeks: 4, requires_integration: 'false', integration_type: 'none',
                 partner_budget_hours: 0, internal_budget_hours: 0,
                 go_live_date: '', go_live_regions: '', rollout_regions: '',
                 project_background: '', main_objectives: [], top_three_pain_points: '',
@@ -574,7 +577,7 @@
                 const goLiveDate = new Date(today.getTime() + 12 * 7 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10);
                 this.form = {
                     id: '', name: 'Continental Automotive AP Automation Pilot', type: 'pilot', status: 'draft',
-                    start_date: startDate, customer_id: firstOrg, deal_winner_id: firstUser, primary_usecase_id: firstUsecase,
+                    start_date: startDate, customer_id: firstOrg, partner_id: '', deal_winner_id: firstUser, primary_usecase_id: firstUsecase,
                     default_duration_weeks: 12, requires_integration: 'true', integration_type: 'sap_cloud_connector',
                     partner_budget_hours: 160, internal_budget_hours: 80,
                     go_live_date: goLiveDate, go_live_regions: 'Germany, Austria, Switzerland',
@@ -656,7 +659,7 @@
 
             resetForm() {
                 this.isEditing = false; this.selectedUsecaseFeatures = []; this.objectiveInput = ''; this.criteriaInput = ''; this.docTypeInput = { document_name: '', accuracy_target: 95 };
-                this.form = { id: '', name: '', type: 'pilot', status: 'draft', start_date: '', customer_id: '', deal_winner_id: '', primary_usecase_id: '', default_duration_weeks: 4, requires_integration: 'false', integration_type: 'none', partner_budget_hours: 0, internal_budget_hours: 0, go_live_date: '', go_live_regions: '', rollout_regions: '', project_background: '', main_objectives: [], top_three_pain_points: '', language_constraints: '', project_risks: '', overall_accuracy_target: null, success_criteria: [], success_criteria_custom: '', document_types: [], annual_doc_volume_per_usecase: null, e2e_cost_per_doc: null, e2e_processing_time_mins: null, automation_improvement_percentage: null, approx_supplier_customer_count: null, target_erp: '', number_erp_systems: '', sap_addon_concerns: '', current_workflow: '', existing_services: '', document_receipt_channels: [], data_points_current: '', users_work_in_studio: '', supplier_guidelines: '', other_processing_guidelines: '', multi_invoice_documents: '', multi_invoice_share: '', poor_quality_scans: '', file_formats_received: [], document_submission_channels: [], expected_doc_types_in_channels: '', out_of_scope_handling: '', email_content_downstream: '', eml_archiving: '', inbound_email_rules: '', email_routing: '', document_classification_method: '', statements_classification: '', statements_downstream: '', leases_recurring_handling: '', po_nonpo_identification: '', po_nonpo_distribution: '', rejection_classification: '', rejection_timing: '', rejection_communication: '', standardized_rejection_messages: '', bounced_rejections_handling: '', verification_team_structure: '', routing_criteria: '', master_data_assignment: '', missing_master_data_handling: '', duplicate_master_data: '', delivery_note_extraction: '', po_types_common: [], po_vs_invoice_values: '', po_deviation_handling: '', missing_po_number: '', non_matched_po_processing: '', custom_gl_logic: '', mandatory_posting_attributes: [], accounting_templates_usage: '', gl_costcenter_assignment: '', reviewer_approver_derivation: '', current_kpis: '', verification_team_kpis: '', special_document_handling: '' };
+                this.form = { id: '', name: '', type: 'pilot', status: 'draft', start_date: '', customer_id: '', partner_id: '', deal_winner_id: '', primary_usecase_id: '', default_duration_weeks: 4, requires_integration: 'false', integration_type: 'none', partner_budget_hours: 0, internal_budget_hours: 0, go_live_date: '', go_live_regions: '', rollout_regions: '', project_background: '', main_objectives: [], top_three_pain_points: '', language_constraints: '', project_risks: '', overall_accuracy_target: null, success_criteria: [], success_criteria_custom: '', document_types: [], annual_doc_volume_per_usecase: null, e2e_cost_per_doc: null, e2e_processing_time_mins: null, automation_improvement_percentage: null, approx_supplier_customer_count: null, target_erp: '', number_erp_systems: '', sap_addon_concerns: '', current_workflow: '', existing_services: '', document_receipt_channels: [], data_points_current: '', users_work_in_studio: '', supplier_guidelines: '', other_processing_guidelines: '', multi_invoice_documents: '', multi_invoice_share: '', poor_quality_scans: '', file_formats_received: [], document_submission_channels: [], expected_doc_types_in_channels: '', out_of_scope_handling: '', email_content_downstream: '', eml_archiving: '', inbound_email_rules: '', email_routing: '', document_classification_method: '', statements_classification: '', statements_downstream: '', leases_recurring_handling: '', po_nonpo_identification: '', po_nonpo_distribution: '', rejection_classification: '', rejection_timing: '', rejection_communication: '', standardized_rejection_messages: '', bounced_rejections_handling: '', verification_team_structure: '', routing_criteria: '', master_data_assignment: '', missing_master_data_handling: '', duplicate_master_data: '', delivery_note_extraction: '', po_types_common: [], po_vs_invoice_values: '', po_deviation_handling: '', missing_po_number: '', non_matched_po_processing: '', custom_gl_logic: '', mandatory_posting_attributes: [], accounting_templates_usage: '', gl_costcenter_assignment: '', reviewer_approver_derivation: '', current_kpis: '', verification_team_kpis: '', special_document_handling: '' };
             },
 
             async openProject(proj) {

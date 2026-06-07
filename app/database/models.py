@@ -391,12 +391,13 @@ class Project(SQLModel, table=True):
     type: ProjectType
     start_date: date
     customer_id: UUID = Field(foreign_key="organization.id")
+    partner_id: Optional[UUID] = Field(default=None, foreign_key="organization.id")
     deal_winner_id: Optional[UUID] = Field(default=None, foreign_key="user.id")
     default_duration_weeks: int
     requires_integration: bool
     integration_type: IntegrationType
-    partner_budget_hours: Decimal = Field(sa_column=Column(Numeric))
-    internal_budget_hours: Decimal = Field(sa_column=Column(Numeric))
+    partner_budget_hours: int = Field(default=0)
+    internal_budget_hours: int = Field(default=0)
     
     # --- NEW FIELDS ---
     status: ProjectStatus = ProjectStatus.draft
@@ -503,7 +504,10 @@ class Project(SQLModel, table=True):
     # Relationships
     customer: Organization = Relationship(
         back_populates="projects",
-        sa_relationship_kwargs={"lazy": "selectin"},
+        sa_relationship_kwargs={"lazy": "selectin", "foreign_keys": "[Project.customer_id]"},
+    )
+    partner: Optional[Organization] = Relationship(
+        sa_relationship_kwargs={"lazy": "selectin", "foreign_keys": "[Project.partner_id]"},
     )
     deal_winner: User = Relationship(
         back_populates="won_projects",
