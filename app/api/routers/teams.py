@@ -157,45 +157,52 @@ async def create_teams_team_for_org(org_id: UUID, session: SessionDep):
     await session.commit()
     await session.refresh(org_group)
 
-    # Provision existing org users into the new team
-    users_result = await session.execute(select(User).where(User.organization_id == org_id))
-    existing_users = users_result.scalars().all()
-    provisioned = []
-    failed = []
-    for user in existing_users:
-        try:
-            display_name = f"{user.first_name} {user.last_name}".strip()
-            prov = await teams_adapter.provision_user_to_team(
-                email=user.email,
-                display_name=display_name,
-                team_id=result_data["id"],
-            )
-            user.teams_user_id = prov["teams_user_object_id"]
-            user.updated_at = datetime.utcnow()
-            session.add(user)
-
-            # Create UserTeamsGroup link if not already present
-            ug_check = await session.execute(
-                select(UserTeamsGroup).where(
-                    UserTeamsGroup.user_id == user.id,
-                    UserTeamsGroup.teams_group_id == org_group.id,
+    # If team is still provisioning, skip auto-adding users (team not ready yet)
+    provisioned: list = []
+    failed: list = []
+    if result_data.get("provisioning"):
+        logger.info(
+            "Teams: team '%s' created but still provisioning — skipping user auto-provision",
+            result_data["name"],
+        )
+    else:
+        # Team is fully ready — provision existing org users
+        users_result = await session.execute(select(User).where(User.organization_id == org_id))
+        existing_users = users_result.scalars().all()
+        for user in existing_users:
+            try:
+                display_name = f"{user.first_name} {user.last_name}".strip()
+                prov = await teams_adapter.provision_user_to_team(
+                    email=user.email,
+                    display_name=display_name,
+                    team_id=result_data["id"],
                 )
-            )
-            if ug_check.scalars().first() is None:
-                session.add(UserTeamsGroup(user_id=user.id, teams_group_id=org_group.id))
+                user.teams_user_id = prov["teams_user_object_id"]
+                user.updated_at = datetime.utcnow()
+                session.add(user)
 
-            provisioned.append(user.email)
-        except Exception as ex:
-            logger.warning("Teams: failed to provision user %s: %s", user.email, ex)
-            failed.append({"email": user.email, "error": str(ex)})
+                ug_check = await session.execute(
+                    select(UserTeamsGroup).where(
+                        UserTeamsGroup.user_id == user.id,
+                        UserTeamsGroup.teams_group_id == org_group.id,
+                    )
+                )
+                if ug_check.scalars().first() is None:
+                    session.add(UserTeamsGroup(user_id=user.id, teams_group_id=org_group.id))
 
-    if provisioned:
-        await session.commit()
+                provisioned.append(user.email)
+            except Exception as ex:
+                logger.warning("Teams: failed to provision user %s: %s", user.email, ex)
+                failed.append({"email": user.email, "error": str(ex)})
+
+        if provisioned:
+            await session.commit()
 
     return {
         "teams_team_id": result_data["id"],
         "teams_team_name": result_data["name"],
         "created": result_data["created"],
+        "provisioning": result_data.get("provisioning", False),
         "users_provisioned": provisioned,
         "users_failed": failed,
     }

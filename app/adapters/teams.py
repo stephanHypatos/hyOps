@@ -28,6 +28,7 @@ Credentials (set in .env):
 
 import asyncio
 import logging
+import re
 import time
 from typing import Optional
 
@@ -36,8 +37,8 @@ import httpx
 from app.config import integration_settings
 
 _TIMEOUT = 30          # seconds per HTTP request
-_POLL_INTERVAL = 3     # seconds between async-op polls
-_POLL_MAX = 20         # max poll attempts (~60 s total)
+_POLL_INTERVAL = 5     # seconds between async-op polls
+_POLL_MAX = 24         # max poll attempts (~120 s total) — MS can take up to 5 min
 _BASE = "https://graph.microsoft.com/v1.0"
 
 logger = logging.getLogger(__name__)
@@ -111,39 +112,72 @@ def _check_team_exists_sync(name: str, token: str) -> Optional[dict]:
     return None
 
 
-def _poll_async_op_sync(location: str, token: str) -> str:
-    """Poll a Graph async-operation URL until it succeeds. Returns targetResourceId (team ID)."""
-    # location may be relative (/teams/…) or absolute
+def _extract_team_id_from_location(location: str) -> Optional[str]:
+    """
+    Extract the Teams team ID from a Content-Location header.
+    Handles both forms:
+      /teams('dbd8de4f-...')/operations('3a6fdece-...')
+      /teams/dbd8de4f-.../operations/3a6fdece-...
+    """
+    # UUID pattern inside the path segment after /teams
+    match = re.search(
+        r"/teams[/(']([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})",
+        location,
+        re.IGNORECASE,
+    )
+    if match:
+        return match.group(1)
+    return None
+
+
+def _poll_async_op_sync(location: str, token: str) -> Optional[str]:
+    """
+    Poll a Graph async-operation URL until it succeeds or we give up.
+    Returns targetResourceId (team ID) on success, None on timeout (non-fatal).
+    """
     if location.startswith("/"):
         location = f"{_BASE}{location}"
     for attempt in range(_POLL_MAX):
         time.sleep(_POLL_INTERVAL)
-        resp = httpx.get(
-            location,
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=_TIMEOUT,
-        )
-        if resp.status_code == 404:
-            logger.info("Teams: async op not ready yet (attempt %d)", attempt + 1)
+        try:
+            resp = httpx.get(
+                location,
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=_TIMEOUT,
+            )
+        except Exception as e:
+            logger.warning("Teams: poll request failed (attempt %d): %s", attempt + 1, e)
             continue
-        resp.raise_for_status()
+
+        if resp.status_code == 404:
+            logger.info("Teams: async op not ready yet (attempt %d/%d)", attempt + 1, _POLL_MAX)
+            continue
+
+        if resp.status_code not in (200, 201):
+            logger.warning("Teams: poll returned %s (attempt %d)", resp.status_code, attempt + 1)
+            continue
+
         data = resp.json()
         op_status = data.get("status", "")
-        logger.info("Teams: async op status=%s (attempt %d)", op_status, attempt + 1)
+        logger.info("Teams: async op status=%s (attempt %d/%d)", op_status, attempt + 1, _POLL_MAX)
+
         if op_status == "succeeded":
-            resource_id = data.get("targetResourceId", "")
-            if not resource_id:
-                raise RuntimeError("Teams: async op succeeded but targetResourceId is empty")
-            return resource_id
+            return data.get("targetResourceId") or None
         if op_status in ("failed", "cancelled"):
             err = data.get("error", {})
             raise RuntimeError(f"Teams: team creation {op_status}: {err.get('message', 'Unknown error')}")
         # "inProgress" / "notStarted" — keep polling
-    raise RuntimeError(f"Teams: team creation timed out after {_POLL_MAX * _POLL_INTERVAL}s")
+
+    logger.warning("Teams: async op poll timed out after %ds — team may still be provisioning", _POLL_MAX * _POLL_INTERVAL)
+    return None  # non-fatal — team ID was already extracted from Content-Location
 
 
 def _create_team_sync(name: str, token: str) -> dict:
-    """Create a new Teams team (admin user as owner). Returns {id, name}."""
+    """
+    Create a new Teams team (admin user as owner).
+    Returns {id, name, provisioning: bool}.
+    `provisioning=True` means the team ID is known but MS is still setting it up.
+    """
     payload = {
         "template@odata.bind": "https://graph.microsoft.com/v1.0/teamsTemplates('standard')",
         "displayName": name,
@@ -158,25 +192,59 @@ def _create_team_sync(name: str, token: str) -> dict:
     }
     logger.info("Teams: creating team '%s'", name)
     resp = httpx.post(f"{_BASE}/teams", json=payload, headers=_h(token), timeout=_TIMEOUT)
-
-    if resp.status_code == 202:
-        # Async — poll the operation URL
-        location = (
-            resp.headers.get("Content-Location") or
-            resp.headers.get("Location", "")
-        )
-        if not location:
-            raise RuntimeError("Teams: 202 returned but no Content-Location/Location header")
-        team_id = _poll_async_op_sync(location, token)
-        logger.info("Teams: team '%s' created (ID: %s)", name, team_id)
-        return {"id": team_id, "name": name}
+    logger.info("Teams: create response status=%s headers=%s", resp.status_code, dict(resp.headers))
 
     if resp.status_code in (200, 201):
+        # Synchronous success (rare but possible)
         data = resp.json()
-        return {"id": data["id"], "name": data.get("displayName", name)}
+        return {"id": data["id"], "name": data.get("displayName", name), "provisioning": False}
 
+    if resp.status_code == 202:
+        location = (
+            resp.headers.get("Content-Location")
+            or resp.headers.get("Location")
+            or ""
+        )
+        logger.info("Teams: 202 Accepted, Content-Location='%s'", location)
+
+        # ── Step 1: Extract team ID from the URL immediately ─────────────────
+        # Microsoft encodes the team ID in Content-Location even before the team
+        # is fully provisioned, e.g.:
+        #   /teams('dbd8de4f-...')/operations('3a6fdece-...')
+        team_id = _extract_team_id_from_location(location)
+        if team_id:
+            logger.info("Teams: team ID extracted from Content-Location: %s", team_id)
+        else:
+            logger.warning("Teams: could not parse team ID from Content-Location='%s'", location)
+
+        # ── Step 2: Poll briefly to see if provisioning completes quickly ─────
+        # If it completes within _POLL_MAX * _POLL_INTERVAL seconds, great.
+        # If not, we already have the team_id from step 1, so we're not blocked.
+        if location:
+            polled_id = _poll_async_op_sync(location, token)
+            if polled_id:
+                team_id = polled_id
+                logger.info("Teams: provisioning confirmed via poll, ID=%s", team_id)
+                return {"id": team_id, "name": name, "provisioning": False}
+
+        if not team_id:
+            raise RuntimeError(
+                "Teams: team creation returned 202 but could not determine team ID "
+                "(no Content-Location / no UUID in URL)"
+            )
+
+        # Team ID known but provisioning still in progress
+        logger.info("Teams: returning team ID=%s (provisioning still in progress)", team_id)
+        return {"id": team_id, "name": name, "provisioning": True}
+
+    # Any other status code is an error
+    try:
+        err_body = resp.json()
+    except Exception:
+        err_body = resp.text
+    logger.error("Teams: create team failed status=%s body=%s", resp.status_code, err_body)
     resp.raise_for_status()
-    raise RuntimeError("Teams: unexpected status code")  # unreachable
+    raise RuntimeError("Teams: unexpected status code")
 
 
 def _list_teams_sync(token: str) -> list:
