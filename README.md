@@ -23,11 +23,12 @@ Internal ops tool for the Hypatos CS team — manages the full lifecycle of cust
 ### Core
 - **Organisations** — manage customers, partners, and internal entities; unique auto-generated org key (2–7 alpha); industry dropdown (25 categories + Other); country dropdown (ISO Alpha-2)
 - **Users** — stakeholders by role (`admin`/`enduser`), type (`customer`/`partner`/`internal`), skills, and languages
-- **Projects** — full lifecycle (pilot, PoC, custom demo, rollout) with rich discovery fields
+- **Projects** — full lifecycle (pilot, PoC, custom demo, rollout) with rich discovery fields; partner org linkage; partner + Hypatos budget fields (integer hours)
 - **Capabilities & Features** — scope specs, cost drivers, effort estimation by team
 - **Use Cases** — linked to features and projects
 - **Document Templates & Generation** — Markdown/DOCX templates (SOW, Success Contract, Solution Design) with variable substitution
 - **ERP Systems & Connectors** — SAP, Coupa, Oracle, and others per project
+- **Documentation Links** — global list of links shared with every new user added to the system
 
 ### Integrations (managed per organisation on the Integrations page)
 
@@ -147,16 +148,19 @@ hyOps/
 ```
 Organization  (key, industry, country)
   ├── Users               (role, type, skills, languages)
-  ├── Projects            (lifecycle, discovery fields, ERP, docs)
+  ├── Projects            (lifecycle, partner_id, partner_budget_hours, internal_budget_hours, ERP, docs)
   ├── OrganizationTeamsGroup      → Teams group + SharePoint copy status
   ├── OrganizationSlackChannel    → client + ext-partner channels
   ├── OrganizationJiraProject     → Jira board link
   └── OrganizationMetabaseGroup   → Metabase group link
 
 JiraLeadUser              (global list of eligible Jira project leads)
+DocumentationLink         (global list of links sent to every new user)
 Capabilities → Features → ScopeSpec / CostDriver / FeatureEffort / UseCases
 DocumentTemplates → GeneratedDocuments
 ```
+
+> **Cascade deletes:** deleting an Organisation automatically removes all its linked records (users, projects, integration links, ERP systems). Deleting a User removes all their link-table entries; references in documents, features, and projects are set to NULL.
 
 ---
 
@@ -167,7 +171,11 @@ Schema changes are managed with plain SQL scripts stored in `migrations/`. Run t
 ```bash
 docker exec hyops_api python migrations/add_org_key.py
 docker exec hyops_api python migrations/add_jira_lead_user.py
+docker exec hyops_api python migrations/add_cascade_deletes.py
+docker exec hyops_api python migrations/add_project_partner.py
 ```
+
+New models added via `SQLModel.metadata.create_all` on startup (no migration script needed for brand-new tables, e.g. `documentation_link`).
 
 ---
 

@@ -49,8 +49,13 @@ app/
     integrations.html      # All integration management (Teams, Slack, Jira, Metabase)
     user.html              # User management
     project.html           # Project management
+    documentation_link.html  # Documentation Links CRUD
     …
 migrations/                # One-shot migration scripts (run inside the container)
+  add_org_key.py           # Adds key column to organization
+  add_jira_lead_user.py    # Creates jira_lead_user table
+  add_cascade_deletes.py   # Adds ON DELETE CASCADE/SET NULL to all FK constraints
+  add_project_partner.py   # Adds partner_id to project; converts budget cols to INTEGER
 docs/
   admin-guide.md           # Human-readable guide for admins
 ```
@@ -79,7 +84,7 @@ async def do_thing(arg: str) -> dict:
 - Raise `HTTPException` for all errors
 
 ### Models
-All SQLModel table classes are in `app/database/models.py`. Add new tables there, then write a `migrate_*.py` script. **Do not use Alembic** — migrations are plain SQL via `sqlalchemy.text`.
+All SQLModel table classes are in `app/database/models.py`. `SQLModel.metadata.create_all` runs on startup and creates any new tables automatically. For changes to *existing* tables (ADD COLUMN, ALTER type, FK changes) write a migration script in `migrations/`. **Do not use Alembic** — migrations are plain SQL via `sqlalchemy.text`.
 
 ### Migrations
 Create a script in the `migrations/` folder:
@@ -134,11 +139,24 @@ Run inside the container: `docker exec hyops_api python migrations/my_change.py`
 |---|---|---|
 | `Organization` | `organization` | Has `key` (2–7 alpha, unique), `industry`, `country` |
 | `User` | `user` | `type`: customer/partner/internal; `role`: admin/enduser |
-| `Project` | `project` | Rich discovery fields |
+| `Project` | `project` | Rich discovery fields; `partner_id` (FK→org, nullable); `partner_budget_hours` + `internal_budget_hours` (int) |
 | `OrganizationTeamsGroup` | `organization_teams_group` | Has `sharepoint_copied_at` |
 | `OrganizationSlackChannel` | `organization_slack_channel` | `channel_type`: client/ext_partner |
 | `OrganizationJiraProject` | `organization_jira_project` | Jira project key + board URL |
 | `JiraLeadUser` | `jira_lead_user` | Global list of eligible Jira project leads |
+| `DocumentationLink` | `documentation_link` | Global list of doc links sent to every new user; fields: `title`, `url`, `description` |
+
+---
+
+## Cascade deletes
+
+All FK constraints from child tables to `organization` and `user` have been set to `ON DELETE CASCADE` or `ON DELETE SET NULL` (migration: `add_cascade_deletes.py`):
+
+- **Deleting an Organisation** cascades to: `user`, `project`, `erp_system`, all `organization_*` integration tables
+- **Deleting a User** cascades to all `user_*` link tables and `project_stakeholder`
+- `document_template.created_by_id`, `feature.owner_id`, `project.deal_winner_id` → `SET NULL` (records survive, reference becomes null)
+
+This means `session.delete(org)` + `session.commit()` is all that is needed — no manual child cleanup required.
 
 ---
 

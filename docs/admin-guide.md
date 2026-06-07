@@ -9,15 +9,17 @@ This guide covers everything an admin needs to know to operate hyOps day-to-day:
 1. [Accessing hyOps](#1-accessing-hyops)
 2. [Organisations](#2-organisations)
 3. [Users](#3-users)
-4. [Integrations Overview](#4-integrations-overview)
-5. [Microsoft Teams](#5-microsoft-teams)
-6. [SharePoint](#6-sharepoint)
-7. [Slack](#7-slack)
-8. [Jira](#8-jira)
-9. [Metabase](#9-metabase)
-10. [Jira Settings — Lead Users](#10-jira-settings--lead-users)
-11. [Running Migrations](#11-running-migrations)
-12. [Troubleshooting](#12-troubleshooting)
+4. [Projects](#4-projects)
+5. [Documentation Links](#5-documentation-links)
+6. [Integrations Overview](#6-integrations-overview)
+7. [Microsoft Teams](#7-microsoft-teams)
+8. [SharePoint](#8-sharepoint)
+9. [Slack](#9-slack)
+10. [Jira](#10-jira)
+11. [Metabase](#11-metabase)
+12. [Jira Settings — Lead Users](#12-jira-settings--lead-users)
+13. [Running Migrations](#13-running-migrations)
+14. [Troubleshooting](#14-troubleshooting)
 
 ---
 
@@ -26,9 +28,10 @@ This guide covers everything an admin needs to know to operate hyOps day-to-day:
 | Page | URL | Purpose |
 |---|---|---|
 | Organisations | http://localhost:8000 | Create / edit / delete organisations |
-| Users | http://localhost:8000/users | Manage users |
-| Integrations | http://localhost:8000/integrations | Set up per-org integrations |
-| Projects | http://localhost:8000/projects | Manage customer projects |
+| Users | http://localhost:8000/users-page | Manage users |
+| Projects | http://localhost:8000/projects-page | Manage customer projects |
+| Documentation Links | http://localhost:8000/documentation-links-page | Manage links sent to new users |
+| Integrations | http://localhost:8000/integrations-page | Set up per-org integrations |
 | API Docs | http://localhost:8000/scalar | Interactive REST API reference |
 
 > Replace `localhost:8000` with your production URL.
@@ -65,7 +68,7 @@ In the Organisation List table, the **Key** badge is click-to-edit:
 3. Press **Enter** or click ✓ to save, **Esc** or ✗ to cancel
 
 ### Deleting an organisation
-Click **Delete** on the row and confirm. This removes the org from hyOps but does **not** delete any linked Teams group, Slack channels, or Jira projects.
+Click **Delete** on the row and confirm. This removes the org and **all linked records** from hyOps (users, projects, integration links, ERP systems). It does **not** delete the external resources themselves (Teams group, Slack channels, Jira project, Metabase group remain untouched in those systems).
 
 ---
 
@@ -93,7 +96,61 @@ Navigate to **Users** (http://localhost:8000/users).
 
 ---
 
-## 4. Integrations Overview
+## 4. Projects
+
+Navigate to **Projects** (http://localhost:8000/projects-page).
+
+### Creating a project
+Fill in the top form rows:
+
+| Field | Required | Notes |
+|---|---|---|
+| Project Name | ✅ | Free text |
+| Status | ✅ | Draft / Completed / Archived |
+| Project Type | ✅ | Pilot / POC / Custom Demo / Rollout |
+| Start Date | ✅ | Date picker |
+| Duration (Weeks) | ✅ | Integer |
+| Customer | ✅ | Dropdown — customer-type orgs only |
+| Partner | — | Dropdown — partner-type orgs only; optional |
+| Deal Winner | ✅ | Internal user |
+| Primary Usecase | — | Optional |
+| Partner Budget (hrs) | — | Integer hours allocated to the partner |
+| Hypatos Budget (hrs) | — | Integer hours allocated to Hypatos internally |
+
+The form also contains expandable sections for discovery fields, document generation, technical integration details, and volume metrics.
+
+### Editing a project
+Click **Edit** on any row. All fields are editable. Click **Update Project** to save.
+
+### Deleting a project
+Click **Delete** on the row and confirm. This removes the project and all its stakeholder links and generated documents from hyOps.
+
+---
+
+## 5. Documentation Links
+
+Navigate to **Documentation Links** (http://localhost:8000/documentation-links-page).
+
+This page manages the global list of documentation links that are shared with every new user added to the system.
+
+### Adding a link
+1. Enter a **Title** (e.g. "Onboarding Guide")
+2. Enter the **URL** (must be a valid URL starting with `https://`)
+3. Optionally add a **Description**
+4. Click **Add Link**
+
+### Editing a link
+Click the ✏️ pencil icon on any row. The form at the top pre-fills with the existing values. Click **Update Link** to save or **Cancel** to discard.
+
+### Deleting a link
+Click the 🗑️ trash icon and confirm. This only removes the link from the list — it does not affect any previously sent communications.
+
+### Opening a link
+Click the URL in the table — it opens in a new browser tab.
+
+---
+
+## 6. Integrations Overview
 
 All integrations are managed from **http://localhost:8000/integrations**.
 
@@ -108,7 +165,7 @@ The page shows a table of all organisations. Each row has a coloured badge if an
 
 ---
 
-## 5. Microsoft Teams
+## 7. Microsoft Teams
 
 ### Create a Teams group for an org
 1. Open the **Configure** modal for the org.
@@ -126,7 +183,7 @@ Once a Teams group exists, use the **Members** sub-panel inside the Teams sectio
 
 ---
 
-## 6. SharePoint
+## 8. SharePoint
 
 After a Teams group is linked:
 
@@ -139,7 +196,7 @@ After a Teams group is linked:
 
 ---
 
-## 7. Slack
+## 9. Slack
 
 ### Create channels for an org
 1. Open the **Configure** modal → Slack section.
@@ -158,7 +215,7 @@ Click **Unlink** to disconnect the channel from hyOps. This does **not** archive
 
 ---
 
-## 8. Jira
+## 10. Jira
 
 ### Create a new Jira project (Option A)
 1. Open the **Configure** modal → Jira section.
@@ -193,7 +250,7 @@ Click **Unlink** in the configured state. This removes the link in hyOps only �
 
 ---
 
-## 9. Metabase
+## 11. Metabase
 
 ### Create a Metabase group
 1. Open **Configure** → Metabase section.
@@ -207,7 +264,7 @@ Click **Unlink** to disconnect. Does not delete the group in Metabase.
 
 ---
 
-## 10. Jira Settings — Lead Users
+## 12. Jira Settings — Lead Users
 
 The **Jira Lead Users** list determines who appears in the Lead dropdown when creating a new Jira project. It is a global setting (not per-org).
 
@@ -235,23 +292,31 @@ curl -u email:token "https://hypatos.atlassian.net/rest/api/3/myself"
 
 ---
 
-## 11. Running Migrations
+## 13. Running Migrations
 
 When a new version of hyOps requires database schema changes, migration scripts are stored in the `migrations/` folder.
 
 ```bash
-# Add the org key column (run once after upgrading)
+# Add the org key column
 docker exec hyops_api python migrations/add_org_key.py
 
-# Add the Jira lead users table (run once after upgrading)
+# Add the Jira lead users table
 docker exec hyops_api python migrations/add_jira_lead_user.py
+
+# Add ON DELETE CASCADE / SET NULL to all FK constraints (fixes org/user deletion)
+docker exec hyops_api python migrations/add_cascade_deletes.py
+
+# Add partner_id to projects and convert budget columns to INTEGER
+docker exec hyops_api python migrations/add_project_partner.py
 ```
 
 Each script is **idempotent** — safe to run multiple times. It will skip steps that are already done.
 
+> **Note:** Brand-new tables (e.g. `documentation_link`) are created automatically by `SQLModel.metadata.create_all` when the container starts — no migration script needed.
+
 ---
 
-## 12. Troubleshooting
+## 14. Troubleshooting
 
 ### App won't start
 ```bash
