@@ -33,6 +33,8 @@ app/
   api/
     router.py              # Master router — includes all sub-routers
     routers/               # One file per domain (organization, user, jira, slack, …)
+      smtp_config.py       # GET/PUT /smtp-config/ + POST /smtp-config/test
+      documentation_link.py  # CRUD /documentation-links/
     schemas/               # Pydantic request/response models
   database/
     models.py              # ALL SQLModel table definitions
@@ -43,13 +45,14 @@ app/
     sharepoint.py          # Microsoft Graph API (SharePoint copy)
     teams.py               # Microsoft Graph API (Teams provisioning)
     metabase.py            # Metabase API
-    email.py               # SMTP email helper
+    email.py               # SMTP email helper (DB config first, .env fallback)
   templates/               # Jinja2 HTML pages
     index.html             # Organizations CRUD
-    integrations.html      # All integration management (Teams, Slack, Jira, Metabase)
+    integrations.html      # All integration management (Teams, Slack, Jira, Metabase, SMTP)
     user.html              # User management
     project.html           # Project management
     documentation_link.html  # Documentation Links CRUD
+    document_template.html   # Document Templates + email preview modal
     …
 migrations/                # One-shot migration scripts (run inside the container)
   add_org_key.py           # Adds key column to organization
@@ -131,6 +134,14 @@ Run inside the container: `docker exec hyops_api python migrations/my_change.py`
 - **Auth**: API key from `METABASE_API_KEY`
 - **DB model**: `OrganizationMetabaseGroup`
 
+### Email / SMTP (`app/api/routers/smtp_config.py`)
+- **Config**: stored in the `smtp_config` singleton DB row (managed via the Integrations page)
+- **Endpoints**: `GET /smtp-config/`, `PUT /smtp-config/`, `POST /smtp-config/test`
+- Password is **never** returned by the API — only a `password_set: bool` flag
+- `PUT` with an empty/absent `password` field keeps the existing password unchanged
+- `POST /smtp-config/test` sends a real test email via `smtplib` STARTTLS to verify config
+- The `app/adapters/email.py` helper reads SMTP credentials from the DB row first, falling back to `.env` vars (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM`)
+
 ---
 
 ## Database models (key ones)
@@ -145,6 +156,7 @@ Run inside the container: `docker exec hyops_api python migrations/my_change.py`
 | `OrganizationJiraProject` | `organization_jira_project` | Jira project key + board URL |
 | `JiraLeadUser` | `jira_lead_user` | Global list of eligible Jira project leads |
 | `DocumentationLink` | `documentation_link` | Global list of doc links sent to every new user; fields: `title`, `url`, `description` |
+| `SmtpConfig` | `smtp_config` | Singleton row (`id=1`) — SMTP server settings for outbound email; managed via Integrations → Email panel |
 
 ---
 

@@ -39,6 +39,7 @@ Internal ops tool for the Hypatos CS team — manages the full lifecycle of cust
 | **Slack** | Creates two private channels: `client-{org}` (internal users) and `ext-partner-{org}` (internal + partner users); manages members |
 | **Jira** | Creates a company-managed Jira Core board (`{org} x Hypatos`); assigns standard Hypatos workflow/permission schemes; OR links an existing project by key |
 | **Metabase** | Creates or links a Metabase group for the org |
+| **Email (SMTP)** | Configures the outbound SMTP server (host, port, credentials, from address) used for automated onboarding emails; test-send from the UI |
 
 ---
 
@@ -129,7 +130,8 @@ hyOps/
 │   │   ├── slack.py              # Slack Web API
 │   │   ├── sharepoint.py         # Microsoft Graph / SharePoint
 │   │   ├── teams.py              # Microsoft Graph / Teams
-│   │   └── metabase.py           # Metabase
+│   │   ├── metabase.py           # Metabase
+│   │   └── email.py              # SMTP email helper (DB config → .env fallback)
 │   ├── templates/                # Jinja2 HTML templates
 │   └── modules/                  # Business logic (doc generation, etc.)
 ├── docs/
@@ -156,6 +158,7 @@ Organization  (key, industry, country)
 
 JiraLeadUser              (global list of eligible Jira project leads)
 DocumentationLink         (global list of links sent to every new user)
+SmtpConfig                (singleton — outbound SMTP server settings)
 Capabilities → Features → ScopeSpec / CostDriver / FeatureEffort / UseCases
 DocumentTemplates → GeneratedDocuments
 ```

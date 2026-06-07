@@ -18,8 +18,9 @@ This guide covers everything an admin needs to know to operate hyOps day-to-day:
 10. [Jira](#10-jira)
 11. [Metabase](#11-metabase)
 12. [Jira Settings — Lead Users](#12-jira-settings--lead-users)
-13. [Running Migrations](#13-running-migrations)
-14. [Troubleshooting](#14-troubleshooting)
+13. [Email (SMTP) Settings](#13-email-smtp-settings)
+14. [Running Migrations](#14-running-migrations)
+15. [Troubleshooting](#15-troubleshooting)
 
 ---
 
@@ -31,7 +32,7 @@ This guide covers everything an admin needs to know to operate hyOps day-to-day:
 | Users | http://localhost:8000/users-page | Manage users |
 | Projects | http://localhost:8000/projects-page | Manage customer projects |
 | Documentation Links | http://localhost:8000/documentation-links-page | Manage links sent to new users |
-| Integrations | http://localhost:8000/integrations-page | Set up per-org integrations |
+| Integrations | http://localhost:8000/integrations-page | Set up per-org integrations + SMTP config |
 | API Docs | http://localhost:8000/scalar | Interactive REST API reference |
 
 > Replace `localhost:8000` with your production URL.
@@ -292,7 +293,54 @@ curl -u email:token "https://hypatos.atlassian.net/rest/api/3/myself"
 
 ---
 
-## 13. Running Migrations
+## 13. Email (SMTP) Settings
+
+The **📧 Email (SMTP) Settings** panel at the bottom of the Integrations page configures the SMTP server used for automated outbound emails (e.g. user onboarding emails rendered from email-type document templates).
+
+Settings are stored in the database (singleton row) — no restart required after saving.
+
+### Configure SMTP
+
+1. On the Integrations page, expand **📧 Email (SMTP) Settings**.
+2. Fill in the fields:
+
+| Field | Example | Notes |
+|---|---|---|
+| SMTP Host | `smtp.office365.com` | Hostname of your mail relay |
+| Port | `587` | 587 for STARTTLS (recommended), 465 for SSL |
+| Use STARTTLS | ✅ | Enable for port 587 |
+| Username | `no-reply@company.com` | SMTP authentication username |
+| Password | — | Stored securely; shown as `(set)` once saved |
+| From Name | `hyOps` | Display name in the From header |
+| From Email | `noreply@company.com` | Sender address; defaults to Username if blank |
+
+3. Click **💾 Save SMTP Settings**.
+
+> The password is **never** returned by the API after saving. Leave the password field blank on subsequent saves to keep the existing password.
+
+### Send a test email
+
+After saving:
+
+1. Enter a recipient address in the **🔬 Send a test email** field.
+2. Click **▶ Send test**.
+3. A green confirmation or a red error message will appear beneath the button.
+
+Common test errors:
+- `Connection refused` — wrong host or port, or firewall blocking outbound SMTP
+- `535 Authentication` — wrong username or password
+- `STARTTLS required` — enable **Use STARTTLS** (port 587)
+
+### How automated emails use this config
+
+When an email-type document template is rendered and sent, `app/adapters/email.py` reads SMTP credentials in this priority order:
+
+1. **Database** — the settings saved on this page
+2. **`.env` file** — `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM` (fallback for environments where DB config is not set)
+
+---
+
+## 14. Running Migrations
 
 When a new version of hyOps requires database schema changes, migration scripts are stored in the `migrations/` folder.
 
@@ -316,7 +364,7 @@ Each script is **idempotent** — safe to run multiple times. It will skip steps
 
 ---
 
-## 14. Troubleshooting
+## 15. Troubleshooting
 
 ### App won't start
 ```bash
