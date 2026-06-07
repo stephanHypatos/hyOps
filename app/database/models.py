@@ -223,35 +223,35 @@ class Organization(SQLModel, table=True):
 
     users: list["User"] = Relationship(
         back_populates="organization",
-        sa_relationship_kwargs={"lazy": "selectin"},
+        sa_relationship_kwargs={"lazy": "selectin", "cascade": "all, delete-orphan"},
     )
     projects: list["Project"] = Relationship(
         back_populates="customer",
-        sa_relationship_kwargs={"lazy": "selectin"},
+        sa_relationship_kwargs={"lazy": "selectin", "cascade": "all, delete-orphan"},
     )
     teams_groups: list["OrganizationTeamsGroup"] = Relationship(
         back_populates="organization",
-        sa_relationship_kwargs={"lazy": "selectin"},
+        sa_relationship_kwargs={"lazy": "selectin", "cascade": "all, delete-orphan"},
     )
     slack_channels: list["OrganizationSlackChannel"] = Relationship(
         back_populates="organization",
-        sa_relationship_kwargs={"lazy": "selectin"},
+        sa_relationship_kwargs={"lazy": "selectin", "cascade": "all, delete-orphan"},
     )
     jira_projects: list["OrganizationJiraProject"] = Relationship(
         back_populates="organization",
-        sa_relationship_kwargs={"lazy": "selectin"},
+        sa_relationship_kwargs={"lazy": "selectin", "cascade": "all, delete-orphan"},
     )
     metabase_groups: list["OrganizationMetabaseGroup"] = Relationship(
         back_populates="organization",
-        sa_relationship_kwargs={"lazy": "selectin"},
+        sa_relationship_kwargs={"lazy": "selectin", "cascade": "all, delete-orphan"},
     )
     hystudio_companies: list["OrganizationHyStudioCompany"] = Relationship(
         back_populates="organization",
-        sa_relationship_kwargs={"lazy": "selectin"},
+        sa_relationship_kwargs={"lazy": "selectin", "cascade": "all, delete-orphan"},
     )
     erp_systems: list["ERPSystem"] = Relationship(
         back_populates="organization",
-        sa_relationship_kwargs={"lazy": "selectin"},
+        sa_relationship_kwargs={"lazy": "selectin", "cascade": "all, delete-orphan"},
     )
 
 
@@ -391,7 +391,7 @@ class Project(SQLModel, table=True):
     type: ProjectType
     start_date: date
     customer_id: UUID = Field(foreign_key="organization.id")
-    deal_winner_id: UUID = Field(foreign_key="user.id")
+    deal_winner_id: Optional[UUID] = Field(default=None, foreign_key="user.id")
     default_duration_weeks: int
     requires_integration: bool
     integration_type: IntegrationType
@@ -568,7 +568,7 @@ class Feature(SQLModel, table=True):
     solution_description: str
     deliverables: str
     scope_type: ScopeType
-    owner_id: UUID = Field(foreign_key="user.id")
+    owner_id: Optional[UUID] = Field(default=None, foreign_key="user.id")
     scoping_questionnaire: bool
     reference_documentation: Optional[str] = Field(default=None)
     included_in_ootb: bool
@@ -702,7 +702,7 @@ class DocumentTemplate(SQLModel, table=True):
     file_format: str = "md"  # "md" or "docx"
     # file_path: Optional[str] = None
 
-    created_by_id: UUID = Field(foreign_key="user.id")
+    created_by_id: Optional[UUID] = Field(default=None, foreign_key="user.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
