@@ -558,14 +558,7 @@
                     const data = await r.json();
                     if (r.ok) {
                         this.teamsOk = true;
-                        const provisioned = data.users_provisioned || [];
-                        if (data.provisioning) {
-                            this.teamsMsg = `✓ Team '${data.teams_team_name}' created (ID: ${data.teams_team_id}) — Microsoft is still provisioning it. Wait ~1 min then add users via the 🔗 button per user.`;
-                        } else if (provisioned.length > 0) {
-                            this.teamsMsg = `✓ Team '${data.teams_team_name}' created and ${provisioned.length} user(s) added`;
-                        } else {
-                            this.teamsMsg = `✓ Team '${data.teams_team_name}' created (ID: ${data.teams_team_id})`;
-                        }
+                        this.teamsMsg = `✓ Team '${data.teams_team_name}' created (ID: ${data.teams_team_id}). Add users manually via the 🔗 button on the Users page.`;
                         this.teams.external_id = data.teams_team_id;
                         this.teams.name = data.teams_team_name;
                         window.integrationsApp && window.integrationsApp.reload();
