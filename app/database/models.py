@@ -956,3 +956,18 @@ class DocumentationLink(SQLModel, table=True):
     description: Optional[str] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class SmtpConfig(SQLModel, table=True):
+    """Singleton table — always exactly one row (id=1)."""
+    __tablename__ = "smtp_config"
+
+    id: int = Field(default=1, primary_key=True)
+    host: Optional[str] = Field(default=None)
+    port: int = Field(default=587)
+    username: Optional[str] = Field(default=None)
+    password: Optional[str] = Field(default=None)
+    from_name: Optional[str] = Field(default="hyOps")
+    from_email: Optional[str] = Field(default=None)
+    use_tls: bool = Field(default=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
