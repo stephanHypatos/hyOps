@@ -942,3 +942,16 @@ class APICredential(SQLModel, table=True):
         back_populates="api_credentials",
         sa_relationship_kwargs={"lazy": "selectin"},
     )
+
+
+class DocumentationLink(SQLModel, table=True):
+    __tablename__ = "documentation_link"
+
+    id: UUID = Field(
+        sa_column=Column(postgresql.UUID, default=uuid4, primary_key=True)
+    )
+    title: str
+    url: str
+    description: Optional[str] = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)

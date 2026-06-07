@@ -101,6 +101,10 @@ async def serve_projects_page(request: Request):
 async def serve_integrations_page(request: Request):
     return templates.TemplateResponse(request=request,name="integrations.html", context={"request": request, "current_page": "integrations"})
 
+@app.get("/documentation-links-page",response_class=HTMLResponse,include_in_schema=False)
+async def serve_documentation_links_page(request: Request):
+    return templates.TemplateResponse(request=request,name="documentation_link.html", context={"request": request, "current_page": "documentation_links"})
+
 
 @app.get("/scalar",include_in_schema=False)
 async def get_scalar_docs():
