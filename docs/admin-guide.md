@@ -237,14 +237,14 @@ curl -u email:token "https://hypatos.atlassian.net/rest/api/3/myself"
 
 ## 11. Running Migrations
 
-When a new version of hyOps requires database schema changes, migration scripts are provided at the repo root.
+When a new version of hyOps requires database schema changes, migration scripts are stored in the `migrations/` folder.
 
 ```bash
 # Add the org key column (run once after upgrading)
-docker exec hyops_api python migrate_add_org_key.py
+docker exec hyops_api python migrations/add_org_key.py
 
 # Add the Jira lead users table (run once after upgrading)
-docker exec hyops_api python migrate_add_jira_lead_user.py
+docker exec hyops_api python migrations/add_jira_lead_user.py
 ```
 
 Each script is **idempotent** — safe to run multiple times. It will skip steps that are already done.

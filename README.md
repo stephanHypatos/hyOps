@@ -133,7 +133,7 @@ hyOps/
 │   └── modules/                  # Business logic (doc generation, etc.)
 ├── docs/
 │   └── admin-guide.md            # Admin user guide
-├── migrate_*.py                  # One-shot DB migration scripts
+├── migrations/                   # One-shot DB migration scripts
 ├── CLAUDE.md                     # AI assistant context file
 ├── Dockerfile
 ├── docker-compose.yml
@@ -162,11 +162,11 @@ DocumentTemplates → GeneratedDocuments
 
 ## Migrations
 
-Schema changes are managed with plain SQL scripts. Run them inside the container:
+Schema changes are managed with plain SQL scripts stored in `migrations/`. Run them inside the container:
 
 ```bash
-docker exec hyops_api python migrate_add_org_key.py
-docker exec hyops_api python migrate_add_jira_lead_user.py
+docker exec hyops_api python migrations/add_org_key.py
+docker exec hyops_api python migrations/add_jira_lead_user.py
 ```
 
 ---
@@ -180,5 +180,5 @@ docker exec hyops_api python migrate_add_jira_lead_user.py
 | Stop | `docker compose down` |
 | Stop + wipe DB | `docker compose down -v` |
 | View logs | `docker compose logs api -f` |
-| Run migration | `docker exec hyops_api python migrate_<name>.py` |
+| Run migration | `docker exec hyops_api python migrations/<name>.py` |
 | Open shell | `docker exec -it hyops_api sh` |

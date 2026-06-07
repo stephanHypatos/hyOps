@@ -50,7 +50,7 @@ app/
     user.html              # User management
     project.html           # Project management
     …
-migrate_*.py               # One-shot migration scripts (run inside the container)
+migrations/                # One-shot migration scripts (run inside the container)
 docs/
   admin-guide.md           # Human-readable guide for admins
 ```
@@ -82,14 +82,14 @@ async def do_thing(arg: str) -> dict:
 All SQLModel table classes are in `app/database/models.py`. Add new tables there, then write a `migrate_*.py` script. **Do not use Alembic** — migrations are plain SQL via `sqlalchemy.text`.
 
 ### Migrations
-Create a script at the repo root:
+Create a script in the `migrations/` folder:
 ```python
-# migrate_my_change.py
+# migrations/my_change.py
 async def run():
     async with engine.begin() as conn:
         await conn.execute(text("ALTER TABLE …"))
 ```
-Run inside the container: `docker exec hyops_api python migrate_my_change.py`
+Run inside the container: `docker exec hyops_api python migrations/my_change.py`
 
 ---
 
@@ -202,7 +202,7 @@ The API container is named `hyops_api`, DB is `hyops_db`.
 
 - New router → add to `app/api/router.py` `include_router(...)`
 - New integration adapter → `app/adapters/<name>.py`, settings in `app/config.py`
-- New DB model → `app/database/models.py`, migration script at repo root
+- New DB model → `app/database/models.py`, migration script in `migrations/`
 - Slugs: `org.name.lower().replace(" ", "-")` via `slugify()` in Slack adapter
 - Error handling: `ValueError` = validation error (422), `RuntimeError` = upstream API error (502)
 - All timestamps use `datetime.utcnow()` as default
