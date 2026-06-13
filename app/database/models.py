@@ -486,13 +486,13 @@ class Project(SQLModel, table=True):
     
     # 🆕 REQUIRED FOR DOCUMENT GENERATION:
     go_live_date: Optional[date] = None
-    go_live_regions: Optional[str] = None
-    rollout_regions: Optional[str] = None
+    go_live_regions: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list)
+    rollout_regions: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list)
     project_background: Optional[str] = None
     main_objectives: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list)
     top_three_pain_points: Optional[str] = None
     language_constraints: Optional[str] = None
-    project_risks: Optional[str] = None
+    project_risks: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list)
     overall_accuracy_target: Optional[int] = None
     success_criteria: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list)
     success_criteria_custom: Optional[str] = None
@@ -956,6 +956,49 @@ class DocumentationLink(SQLModel, table=True):
     description: Optional[str] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ── Project Master Data ───────────────────────────────────────────────────────
+
+class Country(SQLModel, table=True):
+    __tablename__ = "country"
+
+    id: UUID = Field(sa_column=Column(postgresql.UUID, default=uuid4, primary_key=True))
+    name: str = Field(index=True)
+    alpha2_code: str = Field(max_length=2, sa_column=Column(String(2), unique=True, index=True))
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class MasterObjective(SQLModel, table=True):
+    __tablename__ = "master_objective"
+
+    id: UUID = Field(sa_column=Column(postgresql.UUID, default=uuid4, primary_key=True))
+    text: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class MasterSuccessCriterion(SQLModel, table=True):
+    __tablename__ = "master_success_criterion"
+
+    id: UUID = Field(sa_column=Column(postgresql.UUID, default=uuid4, primary_key=True))
+    text: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class MasterProjectRisk(SQLModel, table=True):
+    __tablename__ = "master_project_risk"
+
+    id: UUID = Field(sa_column=Column(postgresql.UUID, default=uuid4, primary_key=True))
+    text: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class MasterERPSystem(SQLModel, table=True):
+    __tablename__ = "master_erp_system"
+
+    id: UUID = Field(sa_column=Column(postgresql.UUID, default=uuid4, primary_key=True))
+    name: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class SmtpConfig(SQLModel, table=True):

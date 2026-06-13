@@ -26,15 +26,15 @@
         <!-- ========================================== -->
         <li class="nav-item">
             <!-- The toggle button. It stays active if any child page is active -->
-            <a class="nav-link {% if current_page in ['organizations', 'users', 'subtypes', 'capabilities','features','languages','skills','document_templates','usecases','documentation_links'] %}active{% endif %}"
+            <a class="nav-link {% if current_page in ['organizations', 'users', 'subtypes', 'capabilities','features','languages','skills','document_templates','usecases','documentation_links','countries','master_objectives','master_success_criteria','master_project_risks','master_erp_systems'] %}active{% endif %}"
                data-bs-toggle="collapse" href="#mainDataMenu" role="button"
-               aria-expanded="{% if current_page in ['organizations', 'users', 'subtypes', 'capabilities','features','languages','skills','document_templates','usecases','documentation_links'] %}true{% else %}false{% endif %}"
+               aria-expanded="{% if current_page in ['organizations', 'users', 'subtypes', 'capabilities','features','languages','skills','document_templates','usecases','documentation_links','countries','master_objectives','master_success_criteria','master_project_risks','master_erp_systems'] %}true{% else %}false{% endif %}"
                aria-controls="mainDataMenu">
                 🗄️ Master Data
             </a>
 
             <!-- Submenu: Automatically opens if a child is the current_page -->
-            <ul class="collapse {% if current_page in ['organizations', 'users', 'subtypes', 'capabilities','features','languages','skills','document_templates','usecases','documentation_links'] %}show{% endif %} nav flex-column submenu" id="mainDataMenu">
+            <ul class="collapse {% if current_page in ['organizations', 'users', 'subtypes', 'capabilities','features','languages','skills','document_templates','usecases','documentation_links','countries','master_objectives','master_success_criteria','master_project_risks','master_erp_systems'] %}show{% endif %} nav flex-column submenu" id="mainDataMenu">
                 <li class="nav-item">
                     <a class="nav-link {% if current_page == 'languages' %}active{% endif %}" href="/languages-page">🌐 Languages</a>
                 </li>
@@ -76,6 +76,22 @@
 
                 <li class="nav-item">
                     <a class="nav-link {% if current_page == 'documentation_links' %}active{% endif %}" href="/documentation-links-page">📎 Documentation Links</a>
+                </li>
+                <li class="nav-item mt-2"><small class="text-muted px-2" style="font-size:0.7rem;text-transform:uppercase;letter-spacing:.05em">Project Lookups</small></li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_page == 'countries' %}active{% endif %}" href="/countries-page">🌍 Countries</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_page == 'master_objectives' %}active{% endif %}" href="/master-objectives-page">🎯 Objectives</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_page == 'master_success_criteria' %}active{% endif %}" href="/master-success-criteria-page">✅ Success Criteria</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_page == 'master_project_risks' %}active{% endif %}" href="/master-project-risks-page">⚠️ Project Risks</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_page == 'master_erp_systems' %}active{% endif %}" href="/master-erp-systems-page">🖥️ ERP Systems</a>
                 </li>
 
             </ul>

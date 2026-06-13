@@ -35,13 +35,13 @@ class ProjectBase(BaseModel):
 
     # Project Details & Objectives
     go_live_date: Optional[date] = None
-    go_live_regions: Optional[str] = None
-    rollout_regions: Optional[str] = None
+    go_live_regions: list[str] = []
+    rollout_regions: list[str] = []
     project_background: Optional[str] = None
     main_objectives: list[str] = []
     top_three_pain_points: Optional[str] = None
     language_constraints: Optional[str] = None
-    project_risks: Optional[str] = None
+    project_risks: list[str] = []
     overall_accuracy_target: Optional[int] = None
 
     # Success Criteria & Document Types
@@ -168,13 +168,13 @@ class ProjectUpdate(BaseModel):
 
     # Project Details & Objectives
     go_live_date: Optional[date] = None
-    go_live_regions: Optional[str] = None
-    rollout_regions: Optional[str] = None
+    go_live_regions: Optional[list[str]] = None
+    rollout_regions: Optional[list[str]] = None
     project_background: Optional[str] = None
     main_objectives: Optional[list[str]] = None
     top_three_pain_points: Optional[str] = None
     language_constraints: Optional[str] = None
-    project_risks: Optional[str] = None
+    project_risks: Optional[list[str]] = None
     overall_accuracy_target: Optional[int] = None
 
     # Success Criteria & Document Types

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Risks</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        .sidebar { width: 260px; min-height: 100vh; }
+        .sidebar .nav-link { color: rgba(255,255,255,0.75); border-radius: 5px; margin-bottom: 5px; }
+        .sidebar .nav-link:hover { color: #fff; background-color: rgba(255,255,255,0.1); }
+        .sidebar .nav-link.active { color: #fff; background-color: #0d6efd; }
+        .sidebar .submenu { padding-left: 1rem; }
+        .sidebar .nav-link[data-bs-toggle="collapse"]::after { content: '\25BC'; float: right; font-size: 0.7rem; margin-top: 0.3rem; transition: transform 0.2s ease-in-out; }
+        .sidebar .nav-link[data-bs-toggle="collapse"][aria-expanded="false"]::after { transform: rotate(-90deg); }
+        @media (max-width: 767.98px) { .sidebar { width: 100%; min-height: auto; } }
+    </style>
+</head>
+<body class="bg-light">
+<div class="d-flex flex-md-row flex-column" x-data="mgr()" x-init="load()">
+    {% include "components/sidebar.html" %}
+    <main class="flex-grow-1 p-4">
+        <div class="d-flex align-items-center mb-4 gap-3">
+            <h1 class="mb-0">⚠️ Project Risks</h1>
+            <span class="badge bg-secondary fs-6" x-text="items.length + ' risks'"></span>
+        </div>
+        <p class="text-muted mb-4">Define predefined project risks that users can select when creating or editing a project.</p>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white d-flex align-items-center gap-2">
+                <i class="bi" :class="editId ? 'bi-pencil-square text-warning' : 'bi-plus-circle text-primary'"></i>
+                <h5 class="mb-0" x-text="editId ? 'Edit Risk' : 'Add Risk'"></h5>
+            </div>
+            <div class="card-body">
+                <form @submit.prevent="save()">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label fw-semibold">Risk Description <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" x-model="form.text" placeholder="e.g. Poor historical data quality" required>
+                        </div>
+                    </div>
+                    <div class="mt-3 d-flex gap-2">
+                        <button type="submit" class="btn" :class="editId ? 'btn-warning' : 'btn-primary'" :disabled="saving">
+                            <span x-show="!saving" x-text="editId ? '✓ Update' : '+ Add Risk'"></span>
+                            <span x-show="saving">Saving…</span>
+                        </button>
+                        <button x-show="editId" type="button" class="btn btn-outline-secondary" @click="reset()">Cancel</button>
+                    </div>
+                    <div x-show="msg" class="mt-2 small" :class="ok ? 'text-success' : 'text-danger'" x-text="msg"></div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body p-0">
+                <div x-show="loading" class="text-center text-muted py-4">Loading…</div>
+                <div x-show="!loading && items.length === 0" class="text-center text-muted py-4">No risks yet.</div>
+                <div x-show="!loading && items.length > 0" class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light"><tr><th>Risk</th><th style="width:100px"></th></tr></thead>
+                        <tbody>
+                            <template x-for="item in items" :key="item.id">
+                                <tr>
+                                    <td x-text="item.text"></td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-secondary me-1" @click="startEdit(item)"><i class="bi bi-pencil"></i></button>
+                                        <button class="btn btn-sm btn-outline-danger" @click="del(item.id)"><i class="bi bi-trash"></i></button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function mgr() {
+    return {
+        items: [], loading: true, saving: false, editId: null, msg: '', ok: true,
+        form: { text: '' },
+        async load() { this.loading = true; try { const r = await fetch('/master-project-risks/'); this.items = await r.json(); } catch(e) {} finally { this.loading = false; } },
+        async save() {
+            this.saving = true; this.msg = '';
+            const url = this.editId ? `/master-project-risks/${this.editId}` : '/master-project-risks/';
+            const method = this.editId ? 'PATCH' : 'POST';
+            try {
+                const r = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(this.form) });
+                const d = await r.json();
+                if (r.ok) { this.ok = true; this.msg = this.editId ? '✓ Updated' : '✓ Added'; await this.load(); this.reset(); }
+                else { this.ok = false; this.msg = '✗ ' + (d.detail || 'Error'); }
+            } catch(e) { this.ok = false; this.msg = '✗ Network error'; } finally { this.saving = false; }
+        },
+        startEdit(item) { this.editId = item.id; this.form = { text: item.text }; this.msg = ''; },
+        reset() { this.editId = null; this.form = { text: '' }; this.msg = ''; },
+        async del(id) { if (!confirm('Delete this risk?')) return; await fetch(`/master-project-risks/${id}`, { method: 'DELETE' }); await this.load(); }
+    }
+}
+</script>
+</body>
+</html>

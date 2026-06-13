@@ -117,18 +117,112 @@
                         <div class="accordion mb-3" id="projectAccordion">
                             <div class="accordion-item"><h2 class="accordion-header"><button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#projDetails">Project Details & Objectives</button></h2><div id="projDetails" class="accordion-collapse collapse show"><div class="accordion-body row g-3">
                                 <div class="col-md-4"><label class="form-label">Go-Live Date</label><input type="date" class="form-control" x-model="form.go_live_date"></div>
-                                <div class="col-md-4"><label class="form-label">Go-Live Regions</label><input type="text" class="form-control" x-model="form.go_live_regions"></div>
-                                <div class="col-md-4"><label class="form-label">Rollout Regions</label><input type="text" class="form-control" x-model="form.rollout_regions"></div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Go-Live Regions</label>
+                                    <div class="border rounded p-2 bg-white" style="min-height:38px">
+                                        <template x-for="(code, i) in form.go_live_regions" :key="code">
+                                            <span class="badge bg-primary me-1 mb-1" style="font-size:0.78rem">
+                                                <span x-text="countryLabel(code)"></span>
+                                                <button type="button" @click="form.go_live_regions.splice(i,1)" class="btn-close btn-close-white ms-1" style="font-size:0.5rem"></button>
+                                            </span>
+                                        </template>
+                                        <select class="border-0 bg-transparent small" style="outline:none;max-width:160px"
+                                                @change="addRegion('go_live_regions',$event.target.value);$event.target.value=''">
+                                            <option value="">+ Add country…</option>
+                                            <template x-for="c in countries.filter(c=>!form.go_live_regions.includes(c.alpha2_code))" :key="c.alpha2_code">
+                                                <option :value="c.alpha2_code" x-text="c.name+' ('+c.alpha2_code+')'"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Rollout Regions</label>
+                                    <div class="border rounded p-2 bg-white" style="min-height:38px">
+                                        <template x-for="(code, i) in form.rollout_regions" :key="code">
+                                            <span class="badge bg-secondary me-1 mb-1" style="font-size:0.78rem">
+                                                <span x-text="countryLabel(code)"></span>
+                                                <button type="button" @click="form.rollout_regions.splice(i,1)" class="btn-close btn-close-white ms-1" style="font-size:0.5rem"></button>
+                                            </span>
+                                        </template>
+                                        <select class="border-0 bg-transparent small" style="outline:none;max-width:160px"
+                                                @change="addRegion('rollout_regions',$event.target.value);$event.target.value=''">
+                                            <option value="">+ Add country…</option>
+                                            <template x-for="c in countries.filter(c=>!form.rollout_regions.includes(c.alpha2_code))" :key="c.alpha2_code">
+                                                <option :value="c.alpha2_code" x-text="c.name+' ('+c.alpha2_code+')'"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                </div>
                                 <div class="col-12"><label class="form-label">Project Background</label><textarea class="form-control" x-model="form.project_background" rows="3"></textarea></div>
-                                <div class="col-12"><label class="form-label">Main Objectives</label><div class="input-group mb-2"><input type="text" class="form-control" x-model="objectiveInput" placeholder="Type an objective" @keydown.enter.prevent="addListItem('main_objectives', objectiveInput); objectiveInput = ''"><button class="btn btn-outline-primary" type="button" @click="addListItem('main_objectives', objectiveInput); objectiveInput = ''"><i class="bi bi-plus-lg"></i></button></div><template x-for="(obj, i) in form.main_objectives" :key="i"><div class="dynamic-item"><span x-text="obj"></span><button type="button" class="btn btn-sm btn-outline-danger" @click="removeListItem('main_objectives', i)"><i class="bi bi-x-lg"></i></button></div></template></div>
+                                <div class="col-12">
+                                    <label class="form-label">Main Objectives</label>
+                                    <div class="d-flex flex-wrap gap-3 mb-2">
+                                        <template x-for="obj in masterObjectives" :key="obj.id">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox"
+                                                       :checked="form.main_objectives.includes(obj.text)"
+                                                       @change="toggleMasterItem('main_objectives', obj.text)">
+                                                <label class="form-check-label small" x-text="obj.text"></label>
+                                            </div>
+                                        </template>
+                                        <span x-show="masterObjectives.length===0" class="text-muted small fst-italic">No predefined objectives — add them in Master Data → Objectives.</span>
+                                    </div>
+                                    <template x-for="val in customItems('main_objectives', masterObjectives)" :key="val">
+                                        <div class="dynamic-item mb-1"><span x-text="val"></span><button type="button" class="btn btn-sm btn-outline-danger ms-2" @click="form.main_objectives.splice(form.main_objectives.indexOf(val),1)"><i class="bi bi-x-lg"></i></button></div>
+                                    </template>
+                                    <div class="input-group input-group-sm mt-2" style="max-width:420px">
+                                        <input type="text" class="form-control" x-model="customObjectiveInput" placeholder="Add custom objective…" @keydown.enter.prevent="addCustomItem('main_objectives','customObjectiveInput')">
+                                        <button class="btn btn-outline-primary" type="button" @click="addCustomItem('main_objectives','customObjectiveInput')"><i class="bi bi-plus-lg"></i></button>
+                                    </div>
+                                </div>
                                 <div class="col-12"><label class="form-label">Top Three Pain Points</label><textarea class="form-control" x-model="form.top_three_pain_points" rows="2"></textarea></div>
                                 <div class="col-md-4"><label class="form-label">Language Constraints</label><select class="form-select" x-model="form.language_constraints"><option value="">Select...</option><option value="No language constraints - English is fine">No language constraints</option><option value="German required">German required</option><option value="French required">French required</option><option value="Multiple languages required">Multiple languages</option></select></div>
                                 <div class="col-md-4"><label class="form-label">Accuracy Target (%)</label><input type="number" class="form-control" x-model="form.overall_accuracy_target" min="0" max="100"></div>
-                                <div class="col-12"><label class="form-label">Project Risks</label><textarea class="form-control" x-model="form.project_risks" rows="2"></textarea></div>
+                                <div class="col-12">
+                                    <label class="form-label">Project Risks</label>
+                                    <div class="d-flex flex-wrap gap-3 mb-2">
+                                        <template x-for="risk in masterProjectRisks" :key="risk.id">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox"
+                                                       :checked="form.project_risks.includes(risk.text)"
+                                                       @change="toggleMasterItem('project_risks', risk.text)">
+                                                <label class="form-check-label small" x-text="risk.text"></label>
+                                            </div>
+                                        </template>
+                                        <span x-show="masterProjectRisks.length===0" class="text-muted small fst-italic">No predefined risks — add them in Master Data → Project Risks.</span>
+                                    </div>
+                                    <template x-for="val in customItems('project_risks', masterProjectRisks)" :key="val">
+                                        <div class="dynamic-item mb-1"><span x-text="val"></span><button type="button" class="btn btn-sm btn-outline-danger ms-2" @click="form.project_risks.splice(form.project_risks.indexOf(val),1)"><i class="bi bi-x-lg"></i></button></div>
+                                    </template>
+                                    <div class="input-group input-group-sm mt-2" style="max-width:420px">
+                                        <input type="text" class="form-control" x-model="customRiskInput" placeholder="Add custom risk…" @keydown.enter.prevent="addCustomItem('project_risks','customRiskInput')">
+                                        <button class="btn btn-outline-primary" type="button" @click="addCustomItem('project_risks','customRiskInput')"><i class="bi bi-plus-lg"></i></button>
+                                    </div>
+                                </div>
                             </div></div></div>
 
                             <div class="accordion-item"><h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#successSection">Success Criteria & Document Types</button></h2><div id="successSection" class="accordion-collapse collapse"><div class="accordion-body row g-3">
-                                <div class="col-12"><label class="form-label">Success Criteria</label><div class="input-group mb-2"><input type="text" class="form-control" x-model="criteriaInput" placeholder="Type a criterion" @keydown.enter.prevent="addListItem('success_criteria', criteriaInput); criteriaInput = ''"><button class="btn btn-outline-primary" type="button" @click="addListItem('success_criteria', criteriaInput); criteriaInput = ''"><i class="bi bi-plus-lg"></i></button></div><template x-for="(crit, i) in form.success_criteria" :key="i"><div class="dynamic-item"><span x-text="crit"></span><button type="button" class="btn btn-sm btn-outline-danger" @click="removeListItem('success_criteria', i)"><i class="bi bi-x-lg"></i></button></div></template></div>
+                                <div class="col-12">
+                                    <label class="form-label">Success Criteria</label>
+                                    <div class="d-flex flex-wrap gap-3 mb-2">
+                                        <template x-for="crit in masterSuccessCriteria" :key="crit.id">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox"
+                                                       :checked="form.success_criteria.includes(crit.text)"
+                                                       @change="toggleMasterItem('success_criteria', crit.text)">
+                                                <label class="form-check-label small" x-text="crit.text"></label>
+                                            </div>
+                                        </template>
+                                        <span x-show="masterSuccessCriteria.length===0" class="text-muted small fst-italic">No predefined criteria — add them in Master Data → Success Criteria.</span>
+                                    </div>
+                                    <template x-for="val in customItems('success_criteria', masterSuccessCriteria)" :key="val">
+                                        <div class="dynamic-item mb-1"><span x-text="val"></span><button type="button" class="btn btn-sm btn-outline-danger ms-2" @click="form.success_criteria.splice(form.success_criteria.indexOf(val),1)"><i class="bi bi-x-lg"></i></button></div>
+                                    </template>
+                                    <div class="input-group input-group-sm mt-2" style="max-width:420px">
+                                        <input type="text" class="form-control" x-model="customCriteriaInput" placeholder="Add custom criterion…" @keydown.enter.prevent="addCustomItem('success_criteria','customCriteriaInput')">
+                                        <button class="btn btn-outline-primary" type="button" @click="addCustomItem('success_criteria','customCriteriaInput')"><i class="bi bi-plus-lg"></i></button>
+                                    </div>
+                                </div>
                                 <div class="col-12"><label class="form-label">Custom Success Criteria</label><textarea class="form-control" x-model="form.success_criteria_custom" rows="2"></textarea></div>
                                 <div class="col-12"><label class="form-label">Document Types & Accuracy</label><div class="row g-2 mb-2"><div class="col-md-5"><input type="text" class="form-control form-control-sm" x-model="docTypeInput.document_name" placeholder="Doc name"></div><div class="col-md-3"><input type="number" class="form-control form-control-sm" x-model="docTypeInput.accuracy_target" placeholder="%" min="0" max="100"></div><div class="col-md-4"><button class="btn btn-sm btn-outline-primary w-100" type="button" @click="addDocType()"><i class="bi bi-plus-lg"></i> Add</button></div></div><template x-for="(dt, i) in form.document_types" :key="i"><div class="dynamic-item"><div><strong x-text="dt.document_name"></strong><span class="badge bg-info ms-2" x-text="dt.accuracy_target + '%'"></span></div><button type="button" class="btn btn-sm btn-outline-danger" @click="form.document_types.splice(i, 1)"><i class="bi bi-x-lg"></i></button></div></template></div>
                             </div></div></div>
@@ -138,13 +232,26 @@
                                 <div class="col-md-4"><label class="form-label">E2E Cost/Doc</label><input type="number" step="0.01" class="form-control" x-model="form.e2e_cost_per_doc" min="0"></div>
                                 <div class="col-md-4"><label class="form-label">E2E Time (mins)</label><input type="number" class="form-control" x-model="form.e2e_processing_time_mins" min="0"></div>
                                 <div class="col-md-4"><label class="form-label">Automation %</label><input type="number" class="form-control" x-model="form.automation_improvement_percentage" min="0" max="100"></div>
-                                <div class="col-md-4"><label class="form-label">Supplier Count</label><input type="number" class="form-control" x-model="form.approx_supplier_customer_count" min="0"></div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Supplier / Customer Count
+                                        <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip" data-bs-placement="top" title="No. of Masterdata records"></i>
+                                    </label>
+                                    <input type="number" class="form-control" x-model="form.approx_supplier_customer_count" min="0">
+                                </div>
                             </div></div></div>
 
                             <div class="accordion-item"><h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#techInteg">Technical Integration</button></h2><div id="techInteg" class="accordion-collapse collapse"><div class="accordion-body row g-3">
                                 <div class="col-md-4"><label class="form-label">Requires Integration?</label><select class="form-select" x-model="form.requires_integration"><option value="true">Yes</option><option value="false">No</option></select></div>
                                 <div class="col-md-8" x-show="form.requires_integration == 'true'" x-transition><label class="form-label">Integration Type</label><select class="form-select" x-model="form.integration_type"><option value="none">None</option><option value="sap_addon">SAP Addon</option><option value="sap_cloud_connector">SAP Cloud Connector</option><option value="coupa_connector">Coupa</option><option value="boomi">Boomi</option><option value="custom_middleware">Custom Middleware</option></select></div>
-                                <div class="col-md-6"><label class="form-label">Target ERP</label><input type="text" class="form-control" x-model="form.target_erp"></div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Target ERP</label>
+                                    <input type="text" class="form-control" list="erp-datalist" x-model="form.target_erp" placeholder="e.g. SAP S/4HANA" autocomplete="off">
+                                    <datalist id="erp-datalist">
+                                        <template x-for="e in masterERPSystems" :key="e.id">
+                                            <option :value="e.name"></option>
+                                        </template>
+                                    </datalist>
+                                </div>
                                 <div class="col-md-6"><label class="form-label"># ERP Systems</label><input type="number" class="form-control" x-model="form.number_erp_systems"></div>
                                 <div class="col-12"><label class="form-label">SAP Addon Concerns</label><textarea class="form-control" x-model="form.sap_addon_concerns" rows="2"></textarea></div>
                                 <div class="col-12"><label class="form-label">Current Workflow</label><input type="text" class="form-control" x-model="form.current_workflow"></div>
@@ -439,6 +546,8 @@
     function projectManager() {
         return {
             projects: [], organizations: [], users: [], usecases: [], loading: true, isEditing: false,
+            countries: [], masterObjectives: [], masterSuccessCriteria: [], masterProjectRisks: [], masterERPSystems: [],
+            customObjectiveInput: '', customCriteriaInput: '', customRiskInput: '',
             objectiveInput: '', criteriaInput: '',
             docTypeInput: { document_name: '', accuracy_target: 95 },
             generatingDocs: false,
@@ -451,9 +560,9 @@
                 id: '', name: '', type: 'pilot', status: 'draft', start_date: '', customer_id: '', partner_id: '', deal_winner_id: '', primary_usecase_id: '',
                 default_duration_weeks: 4, requires_integration: 'false', integration_type: 'none',
                 partner_budget_hours: 0, internal_budget_hours: 0,
-                go_live_date: '', go_live_regions: '', rollout_regions: '',
+                go_live_date: '', go_live_regions: [], rollout_regions: [],
                 project_background: '', main_objectives: [], top_three_pain_points: '',
-                language_constraints: '', project_risks: '', overall_accuracy_target: null,
+                language_constraints: '', project_risks: [], overall_accuracy_target: null,
                 success_criteria: [], success_criteria_custom: '', document_types: [],
                 annual_doc_volume_per_usecase: null, e2e_cost_per_doc: null,
                 e2e_processing_time_mins: null, automation_improvement_percentage: null,
@@ -580,11 +689,11 @@
                     start_date: startDate, customer_id: firstOrg, partner_id: '', deal_winner_id: firstUser, primary_usecase_id: firstUsecase,
                     default_duration_weeks: 12, requires_integration: 'true', integration_type: 'sap_cloud_connector',
                     partner_budget_hours: 160, internal_budget_hours: 80,
-                    go_live_date: goLiveDate, go_live_regions: 'Germany, Austria, Switzerland',
-                    rollout_regions: 'France, Spain, Italy (Phase 2)', project_background: 'AP automation pilot for Continental.',
+                    go_live_date: goLiveDate, go_live_regions: ['DE', 'AT', 'CH'],
+                    rollout_regions: ['FR', 'ES', 'IT'], project_background: 'AP automation pilot for Continental.',
                     main_objectives: ['95%+ STP rate', '<2 min processing time', 'Zero manual entry errors'],
                     top_three_pain_points: '1. Manual keying\n2. No visibility\n3. High exception cost',
-                    language_constraints: 'German required', project_risks: 'Legacy data quality', overall_accuracy_target: 95,
+                    language_constraints: 'German required', project_risks: ['Legacy data quality'], overall_accuracy_target: 95,
                     success_criteria: ['95% header accuracy', '80% PO match rate'], success_criteria_custom: '', 
                     document_types: [{ document_name: 'Invoice', accuracy_target: 96 }],
                     annual_doc_volume_per_usecase: 180000, e2e_cost_per_doc: 12.50, e2e_processing_time_mins: 12,
@@ -616,6 +725,11 @@
                 if (toastEl) { const toast = new bootstrap.Toast(toastEl, { delay: 3000 }); toast.show(); }
             },
 
+            addRegion(field, code) { if (!code || this.form[field].includes(code)) return; this.form[field] = [...this.form[field], code]; },
+            countryLabel(code) { const c = this.countries.find(x => x.alpha2_code === code); return c ? `${c.name} (${c.alpha2_code})` : code; },
+            toggleMasterItem(field, text) { const idx = this.form[field].indexOf(text); if (idx > -1) this.form[field].splice(idx, 1); else this.form[field].push(text); },
+            addCustomItem(field, inputProp) { const val = (this[inputProp] || '').trim(); if (!val || this.form[field].includes(val)) return; this.form[field].push(val); this[inputProp] = ''; },
+            customItems(field, masterItems) { const texts = (masterItems || []).map(m => m.text); return (this.form[field] || []).filter(v => !texts.includes(v)); },
             addListItem(fieldName, value) { if (!value || !value.trim()) return; this.form[fieldName] = [...this.form[fieldName], value.trim()]; },
             removeListItem(fieldName, index) { this.form[fieldName] = this.form[fieldName].filter((_, i) => i !== index); },
             addDocType() { if (!this.docTypeInput.document_name?.trim()) return; this.form.document_types = [...this.form.document_types, { document_name: this.docTypeInput.document_name.trim(), accuracy_target: parseInt(this.docTypeInput.accuracy_target) || 95 }]; this.docTypeInput = { document_name: '', accuracy_target: 95 }; },
@@ -623,18 +737,30 @@
             formatRoleName(role) { if (!role) return '—'; return role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); },
             getRoleBadgeClass(role) { if (!role) return 'bg-secondary'; const h = ['account_executive','solution_architect','project_manager','customer_success_manager','head_of_professional_service']; return h.includes(role) ? 'bg-primary' : 'bg-success'; },
 
-            async initData() { await Promise.all([this.fetchOrganizations(), this.fetchUsers(), this.fetchUsecases(), this.fetchDocTemplates()]); await this.fetchProjects(); },
+            async initData() {
+                await Promise.all([
+                    this.fetchOrganizations(), this.fetchUsers(), this.fetchUsecases(), this.fetchDocTemplates(),
+                    this.fetchCountries(), this.fetchMasterObjectives(), this.fetchMasterSuccessCriteria(),
+                    this.fetchMasterProjectRisks(), this.fetchMasterERPSystems()
+                ]);
+                await this.fetchProjects();
+            },
             async fetchProjects() { this.loading = true; try { const res = await fetch(`${this.apiBase}/projects`); if (!res.ok) throw new Error(); this.projects = await res.json(); } catch (e) { alert("Error fetching projects"); } finally { this.loading = false; } },
             async fetchOrganizations() { try { const res = await fetch(`${this.orgApi}/organizations`); if (!res.ok) throw new Error(); this.organizations = await res.json(); } catch (e) {} },
             async fetchUsers() { try { const res = await fetch(`${this.userApi}/users`); if (!res.ok) throw new Error(); this.users = await res.json(); } catch (e) {} },
             async fetchUsecases() { try { const res = await fetch(`${this.usecaseApi}/usecases`); if (!res.ok) throw new Error(); this.usecases = await res.json(); } catch (e) {} },
+            async fetchCountries() { try { const r = await fetch('/countries/'); this.countries = await r.json(); } catch(e) {} },
+            async fetchMasterObjectives() { try { const r = await fetch('/master-objectives/'); this.masterObjectives = await r.json(); } catch(e) {} },
+            async fetchMasterSuccessCriteria() { try { const r = await fetch('/master-success-criteria/'); this.masterSuccessCriteria = await r.json(); } catch(e) {} },
+            async fetchMasterProjectRisks() { try { const r = await fetch('/master-project-risks/'); this.masterProjectRisks = await r.json(); } catch(e) {} },
+            async fetchMasterERPSystems() { try { const r = await fetch('/master-erp-systems/'); this.masterERPSystems = await r.json(); } catch(e) {} },
             async loadUsecaseFeatures(usecaseId) { this.selectedUsecaseFeatures = []; if (!usecaseId) return; try { const res = await fetch(`${this.usecaseApi}/${usecaseId}/features`); if (!res.ok) throw new Error(); this.selectedUsecaseFeatures = await res.json(); } catch (e) {} },
 
             async submitForm() {
                 let payload = JSON.parse(JSON.stringify(this.form));
                 payload.requires_integration = payload.requires_integration === 'true';
                 Object.keys(payload).forEach((k) => { if (payload[k] === "") payload[k] = null; });
-                const arrayFields = ['document_receipt_channels','file_formats_received','document_submission_channels','po_types_common','mandatory_posting_attributes','main_objectives','success_criteria','document_types'];
+                const arrayFields = ['document_receipt_channels','file_formats_received','document_submission_channels','po_types_common','mandatory_posting_attributes','main_objectives','success_criteria','document_types','go_live_regions','rollout_regions','project_risks'];
                 arrayFields.forEach(field => { if (!Array.isArray(payload[field])) payload[field] = []; });
                 if (!payload.requires_integration) payload.integration_type = "none";
                 try {
@@ -648,7 +774,7 @@
                 this.isEditing = true; let editData = JSON.parse(JSON.stringify(proj));
                 if (editData.start_date?.length > 10) editData.start_date = editData.start_date.substring(0, 10);
                 if (editData.go_live_date?.length > 10) editData.go_live_date = editData.go_live_date.substring(0, 10);
-                const arrayFields = ['document_receipt_channels','file_formats_received','document_submission_channels','po_types_common','mandatory_posting_attributes','main_objectives','success_criteria','document_types'];
+                const arrayFields = ['document_receipt_channels','file_formats_received','document_submission_channels','po_types_common','mandatory_posting_attributes','main_objectives','success_criteria','document_types','go_live_regions','rollout_regions','project_risks'];
                 arrayFields.forEach(field => { editData[field] = Array.isArray(editData[field]) ? editData[field] : []; });
                 editData.requires_integration = editData.requires_integration ? 'true' : 'false';
                 this.form = editData;
@@ -659,7 +785,7 @@
 
             resetForm() {
                 this.isEditing = false; this.selectedUsecaseFeatures = []; this.objectiveInput = ''; this.criteriaInput = ''; this.docTypeInput = { document_name: '', accuracy_target: 95 };
-                this.form = { id: '', name: '', type: 'pilot', status: 'draft', start_date: '', customer_id: '', partner_id: '', deal_winner_id: '', primary_usecase_id: '', default_duration_weeks: 4, requires_integration: 'false', integration_type: 'none', partner_budget_hours: 0, internal_budget_hours: 0, go_live_date: '', go_live_regions: '', rollout_regions: '', project_background: '', main_objectives: [], top_three_pain_points: '', language_constraints: '', project_risks: '', overall_accuracy_target: null, success_criteria: [], success_criteria_custom: '', document_types: [], annual_doc_volume_per_usecase: null, e2e_cost_per_doc: null, e2e_processing_time_mins: null, automation_improvement_percentage: null, approx_supplier_customer_count: null, target_erp: '', number_erp_systems: '', sap_addon_concerns: '', current_workflow: '', existing_services: '', document_receipt_channels: [], data_points_current: '', users_work_in_studio: '', supplier_guidelines: '', other_processing_guidelines: '', multi_invoice_documents: '', multi_invoice_share: '', poor_quality_scans: '', file_formats_received: [], document_submission_channels: [], expected_doc_types_in_channels: '', out_of_scope_handling: '', email_content_downstream: '', eml_archiving: '', inbound_email_rules: '', email_routing: '', document_classification_method: '', statements_classification: '', statements_downstream: '', leases_recurring_handling: '', po_nonpo_identification: '', po_nonpo_distribution: '', rejection_classification: '', rejection_timing: '', rejection_communication: '', standardized_rejection_messages: '', bounced_rejections_handling: '', verification_team_structure: '', routing_criteria: '', master_data_assignment: '', missing_master_data_handling: '', duplicate_master_data: '', delivery_note_extraction: '', po_types_common: [], po_vs_invoice_values: '', po_deviation_handling: '', missing_po_number: '', non_matched_po_processing: '', custom_gl_logic: '', mandatory_posting_attributes: [], accounting_templates_usage: '', gl_costcenter_assignment: '', reviewer_approver_derivation: '', current_kpis: '', verification_team_kpis: '', special_document_handling: '' };
+                this.form = { id: '', name: '', type: 'pilot', status: 'draft', start_date: '', customer_id: '', partner_id: '', deal_winner_id: '', primary_usecase_id: '', default_duration_weeks: 4, requires_integration: 'false', integration_type: 'none', partner_budget_hours: 0, internal_budget_hours: 0, go_live_date: '', go_live_regions: [], rollout_regions: [], project_background: '', main_objectives: [], top_three_pain_points: '', language_constraints: '', project_risks: [], overall_accuracy_target: null, success_criteria: [], success_criteria_custom: '', document_types: [], annual_doc_volume_per_usecase: null, e2e_cost_per_doc: null, e2e_processing_time_mins: null, automation_improvement_percentage: null, approx_supplier_customer_count: null, target_erp: '', number_erp_systems: '', sap_addon_concerns: '', current_workflow: '', existing_services: '', document_receipt_channels: [], data_points_current: '', users_work_in_studio: '', supplier_guidelines: '', other_processing_guidelines: '', multi_invoice_documents: '', multi_invoice_share: '', poor_quality_scans: '', file_formats_received: [], document_submission_channels: [], expected_doc_types_in_channels: '', out_of_scope_handling: '', email_content_downstream: '', eml_archiving: '', inbound_email_rules: '', email_routing: '', document_classification_method: '', statements_classification: '', statements_downstream: '', leases_recurring_handling: '', po_nonpo_identification: '', po_nonpo_distribution: '', rejection_classification: '', rejection_timing: '', rejection_communication: '', standardized_rejection_messages: '', bounced_rejections_handling: '', verification_team_structure: '', routing_criteria: '', master_data_assignment: '', missing_master_data_handling: '', duplicate_master_data: '', delivery_note_extraction: '', po_types_common: [], po_vs_invoice_values: '', po_deviation_handling: '', missing_po_number: '', non_matched_po_processing: '', custom_gl_logic: '', mandatory_posting_attributes: [], accounting_templates_usage: '', gl_costcenter_assignment: '', reviewer_approver_derivation: '', current_kpis: '', verification_team_kpis: '', special_document_handling: '' };
             },
 
             async openProject(proj) {
@@ -678,6 +804,11 @@
             getUsecaseName(id) { const uc = this.usecases.find(u => u.id === id); return uc ? uc.name : id; }
         }
     }
+</script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+    });
 </script>
 </body>
 </html>

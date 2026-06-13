@@ -5,9 +5,8 @@ services:
     container_name: hyops_api
     ports:
       - "8000:8000"
-    environment:
-      # The host is "db" (the service name below). Asyncpg driver is required for AsyncSession.
-      - POSTGRESQL_URL=postgresql+asyncpg://app_user:app_password@db:5432/app_db
+    env_file:
+      - .env
     volumes:
       # Map the current local directory to /app in the container for hot-reloading
       # Local ./app/main.py maps to container /app/app/main.py

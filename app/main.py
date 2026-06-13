@@ -105,6 +105,26 @@ async def serve_integrations_page(request: Request):
 async def serve_documentation_links_page(request: Request):
     return templates.TemplateResponse(request=request,name="documentation_link.html", context={"request": request, "current_page": "documentation_links"})
 
+@app.get("/countries-page",response_class=HTMLResponse,include_in_schema=False)
+async def serve_countries_page(request: Request):
+    return templates.TemplateResponse(request=request,name="country.html", context={"request": request, "current_page": "countries"})
+
+@app.get("/master-objectives-page",response_class=HTMLResponse,include_in_schema=False)
+async def serve_master_objectives_page(request: Request):
+    return templates.TemplateResponse(request=request,name="master_objective.html", context={"request": request, "current_page": "master_objectives"})
+
+@app.get("/master-success-criteria-page",response_class=HTMLResponse,include_in_schema=False)
+async def serve_master_success_criteria_page(request: Request):
+    return templates.TemplateResponse(request=request,name="master_success_criterion.html", context={"request": request, "current_page": "master_success_criteria"})
+
+@app.get("/master-project-risks-page",response_class=HTMLResponse,include_in_schema=False)
+async def serve_master_project_risks_page(request: Request):
+    return templates.TemplateResponse(request=request,name="master_project_risk.html", context={"request": request, "current_page": "master_project_risks"})
+
+@app.get("/master-erp-systems-page",response_class=HTMLResponse,include_in_schema=False)
+async def serve_master_erp_systems_page(request: Request):
+    return templates.TemplateResponse(request=request,name="master_erp_system.html", context={"request": request, "current_page": "master_erp_systems"})
+
 
 @app.get("/scalar",include_in_schema=False)
 async def get_scalar_docs():
