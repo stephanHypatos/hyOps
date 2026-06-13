@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSM Accounts</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        .sidebar { width: 260px; min-height: 100vh; }
+        .sidebar .nav-link { color: rgba(255,255,255,0.75); border-radius: 5px; margin-bottom: 5px; }
+        .sidebar .nav-link:hover { color: #fff; background-color: rgba(255,255,255,0.1); }
+        .sidebar .nav-link.active { color: #fff; background-color: #0d6efd; }
+        .sidebar .submenu { padding-left: 1rem; }
+        .sidebar .nav-link[data-bs-toggle="collapse"]::after { content: '\25BC'; float: right; font-size: 0.7rem; margin-top: 0.3rem; transition: transform 0.2s ease-in-out; }
+        .sidebar .nav-link[data-bs-toggle="collapse"][aria-expanded="false"]::after { transform: rotate(-90deg); }
+        .account-row { cursor: pointer; }
+        .account-row:hover td { background-color: #f0f4ff !important; }
+        .health-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    </style>
+</head>
+<body class="bg-light">
+<div class="d-flex flex-md-row flex-column" x-data="csmList()" x-init="load()">
+    {% include "components/sidebar.html" %}
+    <main class="flex-grow-1 p-4">
+        <div class="d-flex align-items-center mb-4 gap-3 flex-wrap">
+            <h1 class="mb-0">💼 CSM Accounts</h1>
+            <span class="badge bg-secondary fs-6" x-text="filtered.length + ' accounts'"></span>
+            <div class="ms-auto d-flex gap-2 flex-wrap">
+                <!-- Filters -->
+                <select class="form-select form-select-sm" style="width:140px" x-model="filterHealth">
+                    <option value="">All health</option>
+                    <option value="green">🟢 Green</option>
+                    <option value="yellow">🟡 Yellow</option>
+                    <option value="red">🔴 Red</option>
+                    <option value="churned">⚫ Churned</option>
+                    <option value="none">— No status</option>
+                </select>
+                <select class="form-select form-select-sm" style="width:140px" x-model="filterStatus">
+                    <option value="">All status</option>
+                    <option value="onboarding">Onboarding</option>
+                    <option value="live">Live</option>
+                </select>
+                <input type="text" class="form-control form-control-sm" style="width:180px" placeholder="Search account…" x-model="search">
+            </div>
+        </div>
+
+        <div x-show="loading" class="text-center text-muted py-5">Loading accounts…</div>
+
+        <div x-show="!loading" class="card shadow-sm">
+            <div class="card-body p-0">
+                <div x-show="filtered.length === 0" class="text-center text-muted py-5">No accounts match your filters.</div>
+                <div x-show="filtered.length > 0" class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Account</th>
+                                <th>Status</th>
+                                <th>Health</th>
+                                <th>CSM</th>
+                                <th class="text-center">Active Projects</th>
+                                <th class="text-center">Contracts</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="acc in filtered" :key="acc.id">
+                                <tr class="account-row" @click="open(acc.id)">
+                                    <td>
+                                        <div class="fw-semibold" x-text="acc.name"></div>
+                                        <small class="text-muted" x-text="acc.type"></small>
+                                    </td>
+                                    <td>
+                                        <span x-show="acc.account_status === 'live'" class="badge bg-success">Live</span>
+                                        <span x-show="acc.account_status === 'onboarding'" class="badge bg-warning text-dark">Onboarding</span>
+                                        <span x-show="!acc.account_status" class="text-muted small">—</span>
+                                    </td>
+                                    <td>
+                                        <template x-if="acc.health_status">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="health-dot"
+                                                      :style="'background:' + {green:'#198754',yellow:'#ffc107',red:'#dc3545',churned:'#6c757d'}[acc.health_status]"></span>
+                                                <span class="text-capitalize" x-text="acc.health_status"></span>
+                                            </div>
+                                        </template>
+                                        <span x-show="!acc.health_status" class="text-muted small">—</span>
+                                    </td>
+                                    <td>
+                                        <span x-show="acc.csm" x-text="acc.csm ? acc.csm.first_name + ' ' + acc.csm.last_name : ''"></span>
+                                        <span x-show="!acc.csm" class="text-muted small">Unassigned</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge" :class="acc.active_project_count > 0 ? 'bg-primary' : 'bg-light text-muted'" x-text="acc.active_project_count"></span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span x-show="acc.has_unpaid_contracts" class="badge bg-danger">Unpaid</span>
+                                        <span x-show="!acc.has_unpaid_contracts" class="text-muted small">—</span>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function csmList() {
+    return {
+        accounts: [],
+        loading: true,
+        search: '',
+        filterHealth: '',
+        filterStatus: '',
+
+        get filtered() {
+            return this.accounts.filter(a => {
+                if (this.search && !a.name.toLowerCase().includes(this.search.toLowerCase())) return false;
+                if (this.filterHealth === 'none' && a.health_status) return false;
+                if (this.filterHealth && this.filterHealth !== 'none' && a.health_status !== this.filterHealth) return false;
+                if (this.filterStatus && a.account_status !== this.filterStatus) return false;
+                return true;
+            });
+        },
+
+        async load() {
+            this.loading = true;
+            try {
+                const r = await fetch('/csm-accounts/');
+                this.accounts = await r.json();
+            } catch(e) {} finally { this.loading = false; }
+        },
+
+        open(orgId) {
+            window.location.href = `/csm-account-page?org_id=${orgId}`;
+        },
+    };
+}
+</script>
+</body>
+</html>

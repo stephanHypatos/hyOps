@@ -43,6 +43,18 @@ class IntegrationSettings(BaseSettings):
     SMTP_PASSWORD: Optional[str] = None
     EMAIL_FROM: Optional[str] = None
 
+    # Salesforce (Connected App — supports client-credentials and username-password OAuth flows)
+    SALESFORCE_INSTANCE_URL: Optional[str] = None   # e.g. https://login.salesforce.com or https://<org>.my.salesforce.com
+    SALESFORCE_CLIENT_ID: Optional[str] = None       # Connected App consumer key
+    SALESFORCE_CLIENT_SECRET: Optional[str] = None   # Connected App consumer secret
+    SALESFORCE_USERNAME: Optional[str] = None         # only for username-password flow
+    SALESFORCE_PASSWORD: Optional[str] = None         # only for username-password flow
+    SALESFORCE_SECURITY_TOKEN: Optional[str] = None   # appended to password for username-password flow
+
+    # Hypatos Studio credentials are NOT here — Studio supports multiple clusters,
+    # each stored as a row in the `studio_cluster` table (managed on the
+    # Credentials page) rather than as single env values.
+
     model_config = _env_config
 
 

@@ -20,6 +20,20 @@ from fastapi.middleware.cors import CORSMiddleware
 @asynccontextmanager
 async def lifespan_handler(app: FastAPI):
     await create_db_tables()
+    # Overlay DB-stored integration credentials onto the in-memory settings so
+    # the Credentials page takes precedence over the .env file.
+    try:
+        from app.database.session import get_session
+        from app.credentials_store import hydrate_settings
+        agen = get_session()
+        session = await agen.__anext__()
+        try:
+            applied = await hydrate_settings(session)
+            logging.getLogger(__name__).info("Hydrated %d integration credential(s) from DB", applied)
+        finally:
+            await agen.aclose()
+    except Exception as e:
+        logging.getLogger(__name__).warning("Credential hydration skipped: %s", e)
     yield
 
 app = FastAPI(lifespan=lifespan_handler)
@@ -124,6 +138,23 @@ async def serve_master_project_risks_page(request: Request):
 @app.get("/master-erp-systems-page",response_class=HTMLResponse,include_in_schema=False)
 async def serve_master_erp_systems_page(request: Request):
     return templates.TemplateResponse(request=request,name="master_erp_system.html", context={"request": request, "current_page": "master_erp_systems"})
+
+@app.get("/custom-project-fields-page",response_class=HTMLResponse,include_in_schema=False)
+async def serve_custom_project_fields_page(request: Request):
+    return templates.TemplateResponse(request=request,name="custom_project_fields.html", context={"request": request, "current_page": "custom_project_fields"})
+
+@app.get("/csm-page",response_class=HTMLResponse,include_in_schema=False)
+async def serve_csm_page(request: Request):
+    return templates.TemplateResponse(request=request,name="csm_list.html", context={"request": request, "current_page": "csm"})
+
+@app.get("/csm-account-page",response_class=HTMLResponse,include_in_schema=False)
+async def serve_csm_account_page(request: Request):
+    return templates.TemplateResponse(request=request,name="csm_account.html", context={"request": request, "current_page": "csm"})
+
+
+@app.get("/credentials-page",response_class=HTMLResponse,include_in_schema=False)
+async def serve_credentials_page(request: Request):
+    return templates.TemplateResponse(request=request,name="credentials.html", context={"request": request, "current_page": "credentials"})
 
 
 @app.get("/scalar",include_in_schema=False)

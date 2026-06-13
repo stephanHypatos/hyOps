@@ -327,9 +327,9 @@ FORM_SECTIONS = {
             {
                 "id": "target_erp",
                 "label": "Target ERP that Hypatos should integrate with",
-                "type": "select",
+                "type": "multiselect",
                 "required": True,
-                "options": ["SAP ECC", "SAP S/4HANA", "Oracle", "Microsoft Dynamics", "Workday", "Other"]
+                "options": []
             },
             {
                 "id": "sap_addon_concerns",
@@ -376,12 +376,6 @@ FORM_SECTIONS = {
                 "required": False,
                 "rows": 4
             },
-            {
-                "id": "number_erp_systems",
-                "label": "How many ERP systems are you using?",
-                "type": "number",
-                "required": False
-            }
         ]
     },
 

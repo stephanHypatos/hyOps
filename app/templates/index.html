@@ -167,6 +167,43 @@
                             <label for="company_overview" class="form-label">Company Overview</label>
                             <textarea class="form-control" id="company_overview" x-model="form.company_overview" rows="3" placeholder="Brief overview of the company..."></textarea>
                         </div>
+                        <!-- CSM & Account -->
+                        <div class="col-12 mt-2"><hr class="my-1"><small class="text-muted text-uppercase fw-semibold" style="letter-spacing:.05em">CSM & Account</small></div>
+                        <div class="col-md-4">
+                            <label class="form-label">Account Status</label>
+                            <select class="form-select" x-model="form.account_status">
+                                <option value="">— Not set —</option>
+                                <option value="onboarding">Onboarding</option>
+                                <option value="live">Live</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">CSM</label>
+                            <select class="form-select" x-model="form.csm_id">
+                                <option value="">— Not assigned —</option>
+                                <template x-for="u in internalUsers" :key="u.id">
+                                    <option :value="u.id" x-text="u.first_name + ' ' + u.last_name"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Account Executive</label>
+                            <select class="form-select" x-model="form.account_executive_id">
+                                <option value="">— Not assigned —</option>
+                                <template x-for="u in internalUsers" :key="u.id">
+                                    <option :value="u.id" x-text="u.first_name + ' ' + u.last_name"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Sales Representative</label>
+                            <select class="form-select" x-model="form.sales_representative_id">
+                                <option value="">— Not assigned —</option>
+                                <template x-for="u in internalUsers" :key="u.id">
+                                    <option :value="u.id" x-text="u.first_name + ' ' + u.last_name"></option>
+                                </template>
+                            </select>
+                        </div>
                     </div>
                     <div class="mt-4">
                         <button type="submit" class="btn" :class="isEditing ? 'btn-warning' : 'btn-primary'" x-text="isEditing ? 'Update Organization' : 'Create Organization'"></button>
@@ -297,6 +334,7 @@
             // State
             organizations: [],
             availableLanguages: [],
+            internalUsers: [],
             loading: true,
             isEditing: false,
             form: {
@@ -313,6 +351,10 @@
                 company_overview: '',
                 selectedLanguages: [],
                 key: '',
+                account_status: '',
+                csm_id: '',
+                account_executive_id: '',
+                sales_representative_id: '',
             },
 
             // ── Static reference data ─────────────────────────────────────────
@@ -436,6 +478,15 @@
             async init() {
                 await this.fetchLanguages();
                 await this.fetchOrganizations();
+                await this.fetchInternalUsers();
+            },
+
+            async fetchInternalUsers() {
+                try {
+                    const r = await fetch('/user/users');
+                    const all = await r.json();
+                    this.internalUsers = all.filter(u => u.type === 'internal');
+                } catch(e) {}
             },
 
             // Fetch all available languages for the checkbox list
@@ -551,7 +602,11 @@
                 this.form.regions_operation   = this.form.regions_operation   || '';
                 this.form.number_subsidiaries = this.form.number_subsidiaries || '';
                 this.form.company_overview    = this.form.company_overview    || '';
-                this.form.key                 = this.form.key                 || '';
+                this.form.key                          = this.form.key                          || '';
+                this.form.account_status               = this.form.account_status               || '';
+                this.form.csm_id                       = this.form.csm_id                       || '';
+                this.form.account_executive_id         = this.form.account_executive_id         || '';
+                this.form.sales_representative_id      = this.form.sales_representative_id      || '';
 
                 // Industry: match against predefined list or fall back to "Other"
                 const stored = org.industry || '';
@@ -652,6 +707,10 @@
                     company_overview: '',
                     selectedLanguages: [],
                     key: '',
+                    account_status: '',
+                    csm_id: '',
+                    account_executive_id: '',
+                    sales_representative_id: '',
                 };
             },
 

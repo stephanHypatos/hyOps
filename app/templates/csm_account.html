@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSM Account</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        .sidebar { width: 260px; min-height: 100vh; }
+        .sidebar .nav-link { color: rgba(255,255,255,0.75); border-radius: 5px; margin-bottom: 5px; }
+        .sidebar .nav-link:hover { color: #fff; background-color: rgba(255,255,255,0.1); }
+        .sidebar .nav-link.active { color: #fff; background-color: #0d6efd; }
+        .sidebar .submenu { padding-left: 1rem; }
+        .sidebar .nav-link[data-bs-toggle="collapse"]::after { content: '\25BC'; float: right; font-size: 0.7rem; margin-top: 0.3rem; transition: transform 0.2s ease-in-out; }
+        .sidebar .nav-link[data-bs-toggle="collapse"][aria-expanded="false"]::after { transform: rotate(-90deg); }
+        .health-badge-green  { background:#d1fae5; color:#065f46; border:1px solid #6ee7b7; }
+        .health-badge-yellow { background:#fef9c3; color:#713f12; border:1px solid #fde68a; }
+        .health-badge-red    { background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }
+        .health-badge-churned{ background:#f3f4f6; color:#374151; border:1px solid #d1d5db; }
+        .card-section { border-radius: 12px; }
+    </style>
+</head>
+<body class="bg-light">
+<div class="d-flex flex-md-row flex-column" x-data="csmAccount()" x-init="load()">
+    {% include "components/sidebar.html" %}
+    <main class="flex-grow-1 p-4">
+
+        <!-- Back + loading state -->
+        <div x-show="loading" class="text-center text-muted py-5">Loading account…</div>
+
+        <div x-show="!loading && !data">
+            <a href="/csm-page" class="btn btn-outline-secondary mb-3">← Back to Accounts</a>
+            <div class="alert alert-danger">Account not found.</div>
+        </div>
+
+        <template x-if="!loading && data">
+            <div>
+                <!-- ── Header ── -->
+                <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+                    <a href="/csm-page" class="btn btn-outline-secondary btn-sm">← Accounts</a>
+                    <h1 class="mb-0" x-text="data.org.name"></h1>
+                    <span x-show="data.org.account_status === 'live'" class="badge bg-success fs-6">Live</span>
+                    <span x-show="data.org.account_status === 'onboarding'" class="badge bg-warning text-dark fs-6">Onboarding</span>
+                    <template x-if="data.current_health">
+                        <span class="badge fs-6 px-3 py-2"
+                              :class="'health-badge-' + data.current_health.status"
+                              x-text="data.current_health.status.charAt(0).toUpperCase() + data.current_health.status.slice(1)"></span>
+                    </template>
+                    <span x-show="!data.current_health" class="badge bg-light text-muted border fs-6">No health status</span>
+                </div>
+
+                <!-- ── Card grid ── -->
+                <div class="row g-4">
+
+                    <!-- Health card -->
+                    <div class="col-md-6 col-xl-4">
+                        <div class="card card-section shadow-sm h-100">
+                            <div class="card-header bg-white d-flex align-items-center justify-content-between">
+                                <span class="fw-semibold">💚 Health</span>
+                                <button class="btn btn-sm btn-outline-primary" @click="showHealthForm = !showHealthForm">
+                                    <i class="bi bi-plus"></i> Update
+                                </button>
+                            </div>
+                            <!-- Update form -->
+                            <div x-show="showHealthForm" x-transition class="card-body border-bottom pb-3">
+                                <div class="mb-2">
+                                    <label class="form-label small fw-semibold">New Status</label>
+                                    <select class="form-select form-select-sm" x-model="healthForm.status">
+                                        <option value="green">🟢 Green</option>
+                                        <option value="yellow">🟡 Yellow</option>
+                                        <option value="red">🔴 Red</option>
+                                        <option value="churned">⚫ Churned</option>
+                                    </select>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label small fw-semibold">Comment</label>
+                                    <textarea class="form-control form-control-sm" rows="2" x-model="healthForm.comment" placeholder="What changed?"></textarea>
+                                </div>
+                                <button class="btn btn-sm btn-primary" @click="submitHealth()" :disabled="savingHealth">
+                                    <span x-show="!savingHealth">Save</span>
+                                    <span x-show="savingHealth">Saving…</span>
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary ms-1" @click="showHealthForm=false">Cancel</button>
+                            </div>
+                            <!-- Current + history -->
+                            <div class="card-body p-0">
+                                <div x-show="data.health_history.length === 0" class="text-muted text-center py-3 small">No health entries yet.</div>
+                                <ul class="list-group list-group-flush">
+                                    <template x-for="(h, i) in data.health_history.slice(0, showAllHealth ? 999 : 5)" :key="h.id">
+                                        <li class="list-group-item px-3 py-2">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="badge px-2 py-1 text-capitalize"
+                                                      :class="'health-badge-' + h.status"
+                                                      x-text="h.status"></span>
+                                                <small class="text-muted" x-text="new Date(h.created_at).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'})"></small>
+                                                <button x-show="i === 0" class="btn btn-link btn-sm p-0 ms-auto text-danger" @click="deleteHealth(h.id)"><i class="bi bi-trash"></i></button>
+                                            </div>
+                                            <div x-show="h.comment" class="small text-muted mt-1" x-text="h.comment"></div>
+                                        </li>
+                                    </template>
+                                </ul>
+                                <div x-show="data.health_history.length > 5" class="text-center py-2">
+                                    <button class="btn btn-link btn-sm" @click="showAllHealth = !showAllHealth" x-text="showAllHealth ? 'Show less' : 'Show all ' + data.health_history.length + ' entries'"></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Contracts card -->
+                    <div class="col-md-6 col-xl-4">
+                        <div class="card card-section shadow-sm h-100">
+                            <div class="card-header bg-white d-flex align-items-center justify-content-between">
+                                <span class="fw-semibold">📋 Contracts</span>
+                                <button class="btn btn-sm btn-outline-primary" @click="showContractForm = !showContractForm">
+                                    <i class="bi bi-plus"></i> Add
+                                </button>
+                            </div>
+                            <!-- Add contract form -->
+                            <div x-show="showContractForm" x-transition class="card-body border-bottom">
+                                <div class="row g-2">
+                                    <div class="col-12">
+                                        <input type="text" class="form-control form-control-sm" x-model="contractForm.name" placeholder="Contract name *">
+                                    </div>
+                                    <div class="col-6">
+                                        <select class="form-select form-select-sm" x-model="contractForm.type">
+                                            <option value="MSA">MSA</option>
+                                            <option value="SOW">SOW</option>
+                                            <option value="Amendment">Amendment</option>
+                                            <option value="Renewal">Renewal</option>
+                                            <option value="NDA">NDA</option>
+                                            <option value="Other">Other</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <select class="form-select form-select-sm" x-model="contractForm.status">
+                                            <option value="active">Active</option>
+                                            <option value="pending">Pending</option>
+                                            <option value="expired">Expired</option>
+                                            <option value="cancelled">Cancelled</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12">
+                                        <input type="url" class="form-control form-control-sm" x-model="contractForm.url" placeholder="Contract URL">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small">Start date</label>
+                                        <input type="date" class="form-control form-control-sm" x-model="contractForm.start_date">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small">End date</label>
+                                        <input type="date" class="form-control form-control-sm" x-model="contractForm.end_date">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small">Renewal date</label>
+                                        <input type="date" class="form-control form-control-sm" x-model="contractForm.renewal_date">
+                                    </div>
+                                    <div class="col-6 d-flex align-items-end">
+                                        <div class="form-check mb-1">
+                                            <input class="form-check-input" type="checkbox" x-model="contractForm.paid" id="paidCheck">
+                                            <label class="form-check-label small" for="paidCheck">Paid</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <button class="btn btn-sm btn-primary me-1" @click="submitContract()" :disabled="savingContract">
+                                            <span x-show="!savingContract">Save</span>
+                                            <span x-show="savingContract">Saving…</span>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary" @click="showContractForm=false; resetContractForm()">Cancel</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Contract list -->
+                            <div class="card-body p-0">
+                                <div x-show="data.contracts.length === 0" class="text-muted text-center py-3 small">No contracts yet.</div>
+                                <ul class="list-group list-group-flush">
+                                    <template x-for="c in data.contracts" :key="c.id">
+                                        <li class="list-group-item px-3 py-2">
+                                            <div class="d-flex align-items-start gap-2">
+                                                <div class="flex-grow-1">
+                                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                        <span class="fw-semibold small" x-text="c.name"></span>
+                                                        <span class="badge bg-light text-dark border small" x-text="c.type"></span>
+                                                        <span class="badge small"
+                                                              :class="{'bg-success':c.status==='active','bg-warning text-dark':c.status==='pending','bg-secondary':c.status==='expired','bg-danger':c.status==='cancelled'}"
+                                                              x-text="c.status"></span>
+                                                        <span x-show="!c.paid" class="badge bg-danger">Unpaid</span>
+                                                        <span x-show="c.paid" class="badge bg-success">Paid</span>
+                                                    </div>
+                                                    <div class="small text-muted mt-1 d-flex gap-2 flex-wrap">
+                                                        <span x-show="c.start_date" x-text="'Start: ' + c.start_date"></span>
+                                                        <span x-show="c.end_date" x-text="'End: ' + c.end_date"></span>
+                                                        <span x-show="c.renewal_date" x-text="'Renewal: ' + c.renewal_date" class="text-warning fw-semibold"></span>
+                                                    </div>
+                                                </div>
+                                                <div class="d-flex gap-1">
+                                                    <a x-show="c.url" :href="c.url" target="_blank" class="btn btn-sm btn-outline-secondary"><i class="bi bi-link-45deg"></i></a>
+                                                    <button class="btn btn-sm" :class="c.paid ? 'btn-outline-warning' : 'btn-outline-success'" @click="togglePaid(c)" :title="c.paid ? 'Mark unpaid' : 'Mark paid'">
+                                                        <i class="bi" :class="c.paid ? 'bi-x-circle' : 'bi-check-circle'"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-danger" @click="deleteContract(c.id)"><i class="bi bi-trash"></i></button>
+                                                </div>
+                                            </div>
+                                        </li>
+                                    </template>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Team card -->
+                    <div class="col-md-6 col-xl-4">
+                        <div class="card card-section shadow-sm h-100">
+                            <div class="card-header bg-white fw-semibold">👥 Account Team</div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <div class="small text-muted fw-semibold text-uppercase mb-1" style="letter-spacing:.05em">Customer Success Manager</div>
+                                    <template x-if="data.csm">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width:32px;height:32px;font-size:0.8rem" x-text="data.csm.first_name[0] + data.csm.last_name[0]"></div>
+                                            <div>
+                                                <div class="fw-semibold small" x-text="data.csm.first_name + ' ' + data.csm.last_name"></div>
+                                                <div class="text-muted" style="font-size:0.75rem" x-text="data.csm.email"></div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <span x-show="!data.csm" class="text-muted small">— Not assigned</span>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="small text-muted fw-semibold text-uppercase mb-1" style="letter-spacing:.05em">Account Executive</div>
+                                    <template x-if="data.account_executive">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="rounded-circle bg-info text-white d-flex align-items-center justify-content-center" style="width:32px;height:32px;font-size:0.8rem" x-text="data.account_executive.first_name[0] + data.account_executive.last_name[0]"></div>
+                                            <div>
+                                                <div class="fw-semibold small" x-text="data.account_executive.first_name + ' ' + data.account_executive.last_name"></div>
+                                                <div class="text-muted" style="font-size:0.75rem" x-text="data.account_executive.email"></div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <span x-show="!data.account_executive" class="text-muted small">— Not assigned</span>
+                                </div>
+                                <div>
+                                    <div class="small text-muted fw-semibold text-uppercase mb-1" style="letter-spacing:.05em">Sales Representative</div>
+                                    <template x-if="data.sales_representative">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center" style="width:32px;height:32px;font-size:0.8rem" x-text="data.sales_representative.first_name[0] + data.sales_representative.last_name[0]"></div>
+                                            <div>
+                                                <div class="fw-semibold small" x-text="data.sales_representative.first_name + ' ' + data.sales_representative.last_name"></div>
+                                                <div class="text-muted" style="font-size:0.75rem" x-text="data.sales_representative.email"></div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <span x-show="!data.sales_representative" class="text-muted small">— Not assigned</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Projects card -->
+                    <div class="col-md-6 col-xl-4">
+                        <div class="card card-section shadow-sm h-100">
+                            <div class="card-header bg-white fw-semibold">🚀 Projects</div>
+                            <div class="card-body p-0">
+                                <div x-show="data.projects.length === 0" class="text-muted text-center py-3 small">No projects yet.</div>
+                                <ul class="list-group list-group-flush">
+                                    <template x-for="p in data.projects" :key="p.id">
+                                        <li class="list-group-item px-3 py-2">
+                                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                <span class="fw-semibold small" x-text="p.name"></span>
+                                                <span class="badge bg-light text-dark border small text-capitalize" x-text="p.type"></span>
+                                                <span class="badge small"
+                                                      :class="{'bg-primary':p.status==='active','bg-success':p.status==='completed','bg-warning text-dark':p.status==='draft','bg-secondary':p.status==='on_hold','bg-danger':p.status==='cancelled'}"
+                                                      x-text="p.status.replace('_',' ')"></span>
+                                            </div>
+                                            <div class="small text-muted mt-1 d-flex gap-2 flex-wrap">
+                                                <span x-show="p.start_date" x-text="'Start: ' + p.start_date"></span>
+                                                <span x-show="p.go_live_date" x-text="'Go-live: ' + p.go_live_date"></span>
+                                            </div>
+                                        </li>
+                                    </template>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Technical card -->
+                    <div class="col-md-6 col-xl-4">
+                        <div class="card card-section shadow-sm h-100">
+                            <div class="card-header bg-white fw-semibold">🖥️ Technical</div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <div class="small text-muted fw-semibold text-uppercase mb-2" style="letter-spacing:.05em">ERP Systems</div>
+                                    <template x-if="erpSystems.length > 0">
+                                        <div class="d-flex flex-wrap gap-1">
+                                            <template x-for="erp in erpSystems" :key="erp">
+                                                <span class="badge bg-light text-dark border" x-text="erp"></span>
+                                            </template>
+                                        </div>
+                                    </template>
+                                    <span x-show="erpSystems.length === 0" class="text-muted small">—</span>
+                                </div>
+                                <div>
+                                    <div class="small text-muted fw-semibold text-uppercase mb-2" style="letter-spacing:.05em">Integration Types</div>
+                                    <template x-if="integrationTypes.length > 0">
+                                        <div class="d-flex flex-wrap gap-1">
+                                            <template x-for="it in integrationTypes" :key="it">
+                                                <span class="badge bg-light text-dark border" x-text="it.replace(/_/g,' ')"></span>
+                                            </template>
+                                        </div>
+                                    </template>
+                                    <span x-show="integrationTypes.length === 0" class="text-muted small">—</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Integrations card -->
+                    <div class="col-md-6 col-xl-4">
+                        <div class="card card-section shadow-sm h-100">
+                            <div class="card-header bg-white fw-semibold">🔗 Platform Integrations</div>
+                            <div class="card-body">
+                                <div class="d-flex flex-column gap-3">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <i class="bi fs-4" :class="data.integrations.teams ? 'bi-check-circle-fill text-success' : 'bi-x-circle text-muted'"></i>
+                                        <span :class="data.integrations.teams ? 'fw-semibold' : 'text-muted'">Microsoft Teams</span>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <i class="bi fs-4" :class="data.integrations.jira ? 'bi-check-circle-fill text-success' : 'bi-x-circle text-muted'"></i>
+                                        <span :class="data.integrations.jira ? 'fw-semibold' : 'text-muted'">Jira</span>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <i class="bi fs-4" :class="data.integrations.slack ? 'bi-check-circle-fill text-success' : 'bi-x-circle text-muted'"></i>
+                                        <span :class="data.integrations.slack ? 'fw-semibold' : 'text-muted'">Slack</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div><!-- /row -->
+            </div>
+        </template>
+
+    </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function csmAccount() {
+    return {
+        orgId: new URLSearchParams(window.location.search).get('org_id'),
+        data: null,
+        loading: true,
+        showAllHealth: false,
+
+        // Health form
+        showHealthForm: false,
+        healthForm: { status: 'green', comment: '' },
+        savingHealth: false,
+
+        // Contract form
+        showContractForm: false,
+        contractForm: { name: '', type: 'MSA', status: 'active', url: '', start_date: '', end_date: '', renewal_date: '', paid: false },
+        savingContract: false,
+
+        get erpSystems() {
+            if (!this.data) return [];
+            const all = this.data.projects.flatMap(p => p.target_erp || []);
+            return [...new Set(all)];
+        },
+        get integrationTypes() {
+            if (!this.data) return [];
+            const all = this.data.projects
+                .map(p => p.integration_type)
+                .filter(t => t && t !== 'none');
+            return [...new Set(all)];
+        },
+
+        async load() {
+            if (!this.orgId) { this.loading = false; return; }
+            this.loading = true;
+            try {
+                const r = await fetch(`/csm-accounts/${this.orgId}/overview`);
+                if (r.ok) this.data = await r.json();
+            } catch(e) {} finally { this.loading = false; }
+        },
+
+        async submitHealth() {
+            this.savingHealth = true;
+            try {
+                const r = await fetch('/account-health/', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ org_id: this.orgId, ...this.healthForm }),
+                });
+                if (r.ok) {
+                    this.showHealthForm = false;
+                    this.healthForm = { status: 'green', comment: '' };
+                    await this.load();
+                }
+            } catch(e) {} finally { this.savingHealth = false; }
+        },
+
+        async deleteHealth(id) {
+            if (!confirm('Delete this health entry?')) return;
+            await fetch(`/account-health/entry/${id}`, { method: 'DELETE' });
+            await this.load();
+        },
+
+        resetContractForm() {
+            this.contractForm = { name: '', type: 'MSA', status: 'active', url: '', start_date: '', end_date: '', renewal_date: '', paid: false };
+        },
+
+        async submitContract() {
+            if (!this.contractForm.name.trim()) return;
+            this.savingContract = true;
+            const payload = { org_id: this.orgId, ...this.contractForm };
+            // strip empty strings from optional date fields
+            ['start_date','end_date','renewal_date','url'].forEach(k => { if (!payload[k]) payload[k] = null; });
+            try {
+                const r = await fetch('/contracts/', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify(payload),
+                });
+                if (r.ok) {
+                    this.showContractForm = false;
+                    this.resetContractForm();
+                    await this.load();
+                }
+            } catch(e) {} finally { this.savingContract = false; }
+        },
+
+        async togglePaid(contract) {
+            await fetch(`/contracts/${contract.id}`, {
+                method: 'PATCH',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ paid: !contract.paid }),
+            });
+            await this.load();
+        },
+
+        async deleteContract(id) {
+            if (!confirm('Delete this contract?')) return;
+            await fetch(`/contracts/${id}`, { method: 'DELETE' });
+            await this.load();
+        },
+    };
+}
+</script>
+</body>
+</html>

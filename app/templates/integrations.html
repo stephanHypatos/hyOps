@@ -337,124 +337,6 @@
             </div>
         </div>
 
-        <!-- ── Email (SMTP) Settings ─────────────────────────────────────────── -->
-        <div class="card shadow-sm mt-3">
-            <div class="card-header bg-white">
-                <button class="btn btn-link text-decoration-none p-0 fw-semibold text-dark"
-                        data-bs-toggle="collapse" data-bs-target="#smtpPanel">
-                    📧 Email (SMTP) Settings
-                    <span class="text-muted small ms-2">(used for automated onboarding emails)</span>
-                    <span x-show="smtp.configured"
-                          class="integration-badge badge-configured ms-2">
-                        <span class="status-dot dot-green"></span> configured
-                    </span>
-                    <span x-show="!smtp.configured"
-                          class="integration-badge badge-not-configured ms-2">
-                        <span class="status-dot dot-gray"></span> not configured
-                    </span>
-                </button>
-            </div>
-            <div class="collapse" id="smtpPanel">
-                <div class="card-body">
-                    <div x-show="smtp.loading" class="text-muted small mb-3">Loading…</div>
-                    <div x-show="!smtp.loading">
-                        <div class="row g-3">
-                            <!-- Host -->
-                            <div class="col-md-6">
-                                <label class="form-label form-label-sm small">SMTP Host</label>
-                                <input type="text" class="form-control form-control-sm"
-                                       placeholder="smtp.office365.com"
-                                       x-model="smtp.form.host">
-                            </div>
-                            <!-- Port -->
-                            <div class="col-md-2">
-                                <label class="form-label form-label-sm small">Port</label>
-                                <input type="number" class="form-control form-control-sm"
-                                       placeholder="587"
-                                       x-model.number="smtp.form.port">
-                            </div>
-                            <!-- Use TLS -->
-                            <div class="col-md-4 d-flex align-items-end">
-                                <div class="form-check mb-1">
-                                    <input type="checkbox" class="form-check-input" id="smtpTls"
-                                           x-model="smtp.form.use_tls">
-                                    <label class="form-check-label small" for="smtpTls">Use STARTTLS</label>
-                                </div>
-                            </div>
-                            <!-- Username -->
-                            <div class="col-md-6">
-                                <label class="form-label form-label-sm small">Username / Email</label>
-                                <input type="text" class="form-control form-control-sm"
-                                       placeholder="no-reply@yourcompany.com"
-                                       x-model="smtp.form.username">
-                            </div>
-                            <!-- Password -->
-                            <div class="col-md-6">
-                                <label class="form-label form-label-sm small">Password
-                                    <span x-show="smtp.passwordSet" class="text-success ms-1 small">(set — leave blank to keep)</span>
-                                </label>
-                                <input type="password" class="form-control form-control-sm"
-                                       placeholder="••••••••"
-                                       x-model="smtp.form.password">
-                            </div>
-                            <!-- From Name -->
-                            <div class="col-md-4">
-                                <label class="form-label form-label-sm small">From Name</label>
-                                <input type="text" class="form-control form-control-sm"
-                                       placeholder="hyOps"
-                                       x-model="smtp.form.from_name">
-                            </div>
-                            <!-- From Email -->
-                            <div class="col-md-8">
-                                <label class="form-label form-label-sm small">From Email Address</label>
-                                <input type="email" class="form-control form-control-sm"
-                                       placeholder="noreply@yourcompany.com"
-                                       x-model="smtp.form.from_email">
-                            </div>
-                        </div>
-
-                        <!-- Save button -->
-                        <div class="d-flex gap-2 mt-3">
-                            <button class="btn btn-sm btn-primary"
-                                    :disabled="smtp.saving"
-                                    @click="saveSmtp()">
-                                <span x-show="!smtp.saving">💾 Save SMTP Settings</span>
-                                <span x-show="smtp.saving">Saving…</span>
-                            </button>
-                        </div>
-
-                        <!-- Feedback -->
-                        <div x-show="smtp.msg" class="mt-2 small"
-                             :class="smtp.ok ? 'text-success' : 'text-danger'"
-                             x-text="smtp.msg"></div>
-
-                        <!-- Test email section -->
-                        <hr class="my-3">
-                        <p class="small fw-semibold mb-2">🔬 Send a test email</p>
-                        <div class="row g-2 align-items-end">
-                            <div class="col-md-6">
-                                <label class="form-label form-label-sm mb-1 small">Recipient address</label>
-                                <input type="email" class="form-control form-control-sm"
-                                       placeholder="you@example.com"
-                                       x-model="smtp.testEmail">
-                            </div>
-                            <div class="col-md-3">
-                                <button class="btn btn-sm btn-outline-secondary w-100"
-                                        :disabled="smtp.testing || !smtp.testEmail"
-                                        @click="testSmtp()">
-                                    <span x-show="!smtp.testing">▶ Send test</span>
-                                    <span x-show="smtp.testing">Sending…</span>
-                                </button>
-                            </div>
-                        </div>
-                        <div x-show="smtp.testMsg" class="mt-2 small"
-                             :class="smtp.testOk ? 'text-success' : 'text-danger'"
-                             x-text="smtp.testMsg"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
     </main>
 </div>
 
@@ -1363,24 +1245,9 @@
                 saving: false, msg: '', ok: true,
             },
 
-            smtp: {
-                loading: true,
-                configured: false,
-                passwordSet: false,
-                saving: false,
-                msg: '', ok: true,
-                testEmail: '',
-                testing: false,
-                testMsg: '', testOk: true,
-                form: {
-                    host: '', port: 587, username: '', password: '',
-                    from_name: 'hyOps', from_email: '', use_tls: true,
-                },
-            },
-
             async init() {
                 window.integrationsApp = this;
-                await Promise.all([this.fetchOrgs(), this.loadJiraLeadUsers(), this.loadSmtp()]);
+                await Promise.all([this.fetchOrgs(), this.loadJiraLeadUsers()]);
                 this._modal = new bootstrap.Modal(document.getElementById('configModal'));
             },
 
@@ -1569,75 +1436,6 @@
                     }
                 } catch(e) { this.jiraAdmin.ok = false; this.jiraAdmin.msg = '✗ Network error'; }
                 finally { this.jiraAdmin.saving = false; }
-            },
-
-            // ── SMTP config ────────────────────────────────────────────────────
-            async loadSmtp() {
-                this.smtp.loading = true;
-                try {
-                    const r = await fetch('/smtp-config/');
-                    if (r.ok) {
-                        const d = await r.json();
-                        this.smtp.form.host       = d.host       || '';
-                        this.smtp.form.port       = d.port       || 587;
-                        this.smtp.form.username   = d.username   || '';
-                        this.smtp.form.from_name  = d.from_name  || 'hyOps';
-                        this.smtp.form.from_email = d.from_email || '';
-                        this.smtp.form.use_tls    = d.use_tls !== false;
-                        this.smtp.form.password   = '';    // never pre-fill
-                        this.smtp.passwordSet     = d.password_set;
-                        this.smtp.configured      = !!(d.host && d.username && d.password_set);
-                    }
-                } catch(e) { /* non-fatal */ }
-                finally { this.smtp.loading = false; }
-            },
-
-            async saveSmtp() {
-                this.smtp.saving = true; this.smtp.msg = ''; this.smtp.ok = true;
-                const payload = { ...this.smtp.form };
-                // Don't send empty password — means "keep existing"
-                if (!payload.password) delete payload.password;
-                try {
-                    const r = await fetch('/smtp-config/', {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload),
-                    });
-                    const data = await r.json();
-                    if (r.ok) {
-                        this.smtp.ok  = true;
-                        this.smtp.msg = '✓ SMTP settings saved';
-                        this.smtp.passwordSet = data.password_set;
-                        this.smtp.configured  = !!(data.host && data.username && data.password_set);
-                        this.smtp.form.password = '';  // clear after save
-                    } else {
-                        this.smtp.ok  = false;
-                        this.smtp.msg = '✗ ' + (data.detail || 'Error saving');
-                    }
-                } catch(e) { this.smtp.ok = false; this.smtp.msg = '✗ Network error'; }
-                finally { this.smtp.saving = false; }
-            },
-
-            async testSmtp() {
-                const addr = (this.smtp.testEmail || '').trim();
-                if (!addr) return;
-                this.smtp.testing = true; this.smtp.testMsg = ''; this.smtp.testOk = true;
-                try {
-                    const r = await fetch('/smtp-config/test', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ to_email: addr }),
-                    });
-                    const data = await r.json();
-                    if (r.ok) {
-                        this.smtp.testOk  = true;
-                        this.smtp.testMsg = `✓ Test email sent to ${addr}`;
-                    } else {
-                        this.smtp.testOk  = false;
-                        this.smtp.testMsg = '✗ ' + (data.detail || 'Send failed');
-                    }
-                } catch(e) { this.smtp.testOk = false; this.smtp.testMsg = '✗ Network error'; }
-                finally { this.smtp.testing = false; }
             },
 
             openModal(org) {

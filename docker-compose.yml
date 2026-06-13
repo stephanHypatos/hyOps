@@ -11,7 +11,8 @@ services:
       # Map the current local directory to /app in the container for hot-reloading
       # Local ./app/main.py maps to container /app/app/main.py
       - .:/app
-    command: fastapi run --host 0.0.0.0 --port 8000
+    # fastapi dev watches the mounted source and auto-reloads on .py changes
+    command: fastapi dev --host 0.0.0.0 --port 8000
     depends_on:
       db:
         condition: service_healthy

@@ -219,6 +219,14 @@ class Organization(SQLModel, table=True):
     number_subsidiaries: Optional[str] = Field(default=None)
     company_overview: Optional[str] = Field(default=None)
     languages: Optional[str] = Field(default=None)  # comma-separated
+
+    # CSM & Account
+    csm_id: Optional[UUID] = Field(sa_column=Column(postgresql.UUID, nullable=True, default=None))
+    account_executive_id: Optional[UUID] = Field(sa_column=Column(postgresql.UUID, nullable=True, default=None))
+    sales_representative_id: Optional[UUID] = Field(sa_column=Column(postgresql.UUID, nullable=True, default=None))
+    account_status: Optional[str] = Field(default=None)  # onboarding / live
+    health_score_question_id: Optional[str] = Field(default=None)  # future Metabase hook
+
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -263,7 +271,7 @@ class Subtype(SQLModel, table=True):
     id: UUID = Field(
         sa_column=Column(postgresql.UUID, default=uuid4, primary_key=True)
     )
-    name: SubtypeName
+    name: str
     description: Optional[str] = Field(default=None)
 
     users: list["User"] = Relationship(
@@ -405,13 +413,12 @@ class Project(SQLModel, table=True):
     primary_usecase_id: Optional[UUID] = Field(default=None, foreign_key="usecase.id")
 
     # Technical Integration
-    target_erp: Optional[str] = None
+    target_erp: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list)
     sap_addon_concerns: Optional[str] = None
     current_workflow: Optional[str] = None
     existing_services: Optional[str] = None
     document_receipt_channels: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list)
     data_points_current: Optional[str] = None
-    number_erp_systems: Optional[int] = None
 
     # Document Processing Discovery
     users_work_in_studio: Optional[str] = None
@@ -477,6 +484,7 @@ class Project(SQLModel, table=True):
     current_kpis: Optional[str] = None
     verification_team_kpis: Optional[str] = None
     special_document_handling: Optional[str] = None
+    custom_answers: dict = Field(sa_column=Column(postgresql.JSONB), default_factory=dict)
 
     # --- Generated Document Paths ---
     # sow_markdown_path: Optional[str] = None
@@ -1001,6 +1009,58 @@ class MasterERPSystem(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class CustomSection(SQLModel, table=True):
+    __tablename__ = "custom_section"
+
+    id: UUID = Field(sa_column=Column(postgresql.UUID, default=uuid4, primary_key=True))
+    name: str
+    order: int = Field(default=0)
+    use_case_id: Optional[UUID] = Field(sa_column=Column(postgresql.UUID, nullable=True, default=None))
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class CustomQuestion(SQLModel, table=True):
+    __tablename__ = "custom_question"
+
+    id: UUID = Field(sa_column=Column(postgresql.UUID, default=uuid4, primary_key=True))
+    section_id: UUID = Field(sa_column=Column(postgresql.UUID, nullable=False))
+    label: str
+    type: str = Field(default="text")  # text | textarea | number | select
+    options: list = Field(sa_column=Column(postgresql.JSONB), default_factory=list)
+    required: bool = Field(default=False)
+    order: int = Field(default=0)
+    help_text: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class AccountHealth(SQLModel, table=True):
+    __tablename__ = "account_health"
+
+    id: UUID = Field(sa_column=Column(postgresql.UUID, default=uuid4, primary_key=True))
+    org_id: UUID = Field(sa_column=Column(postgresql.UUID, nullable=False))
+    status: str  # green / yellow / red / churned
+    comment: Optional[str] = None
+    created_by_id: Optional[UUID] = Field(sa_column=Column(postgresql.UUID, nullable=True, default=None))
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class Contract(SQLModel, table=True):
+    __tablename__ = "contract"
+
+    id: UUID = Field(sa_column=Column(postgresql.UUID, default=uuid4, primary_key=True))
+    org_id: UUID = Field(sa_column=Column(postgresql.UUID, nullable=False))
+    project_id: Optional[UUID] = Field(sa_column=Column(postgresql.UUID, nullable=True, default=None))
+    name: str
+    type: str = Field(default="MSA")       # MSA / SOW / Amendment / Renewal / NDA / Other
+    status: str = Field(default="active")  # active / expired / pending / cancelled
+    url: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    renewal_date: Optional[date] = None
+    paid: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class SmtpConfig(SQLModel, table=True):
     """Singleton table — always exactly one row (id=1)."""
     __tablename__ = "smtp_config"
@@ -1013,4 +1073,31 @@ class SmtpConfig(SQLModel, table=True):
     from_name: Optional[str] = Field(default="hyOps")
     from_email: Optional[str] = Field(default=None)
     use_tls: bool = Field(default=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class IntegrationCredential(SQLModel, table=True):
+    """Key/value store for integration credentials, managed from the admin
+    Credentials page. The key matches the corresponding .env variable name
+    (e.g. SLACK_BOT_TOKEN). Values stored here overlay `integration_settings`
+    at startup, so the DB takes precedence over the .env file."""
+    __tablename__ = "integration_credential"
+
+    key: str = Field(primary_key=True)
+    value: Optional[str] = Field(default=None)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class StudioCluster(SQLModel, table=True):
+    """A Hypatos Studio cluster's OAuth credentials. Studio runs on multiple
+    clusters (e.g. EU / US), so credentials are stored as a list rather than as
+    single env values. Adapters resolve a cluster by name (or the default)."""
+    __tablename__ = "studio_cluster"
+
+    id: UUID = Field(sa_column=Column(postgresql.UUID, default=uuid4, primary_key=True))
+    name: str = Field(index=True)                 # human label, e.g. "EU", "US"
+    base_url: str
+    client_id: str
+    client_secret: str
+    is_default: bool = Field(default=False)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

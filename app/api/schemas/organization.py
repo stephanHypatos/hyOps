@@ -50,6 +50,11 @@ class OrganizationUpdate(BaseModel):
     company_overview: Optional[str] = None
     languages: Optional[str] = None
     key: Optional[str] = None   # 2–7 uppercase letters; validated below
+    csm_id: Optional[UUID] = None
+    account_executive_id: Optional[UUID] = None
+    sales_representative_id: Optional[UUID] = None
+    account_status: Optional[str] = None
+    health_score_question_id: Optional[str] = None
 
     @field_validator("key", mode="before")
     @classmethod
@@ -67,3 +72,8 @@ class OrganizationRead(OrganizationBase):
     number_subsidiaries: Optional[str] = None
     company_overview: Optional[str] = None
     languages: Optional[str] = None
+    csm_id: Optional[UUID] = None
+    account_executive_id: Optional[UUID] = None
+    sales_representative_id: Optional[UUID] = None
+    account_status: Optional[str] = None
+    health_score_question_id: Optional[str] = None

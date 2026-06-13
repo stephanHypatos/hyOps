@@ -26,15 +26,15 @@
         <!-- ========================================== -->
         <li class="nav-item">
             <!-- The toggle button. It stays active if any child page is active -->
-            <a class="nav-link {% if current_page in ['organizations', 'users', 'subtypes', 'capabilities','features','languages','skills','document_templates','usecases','documentation_links','countries','master_objectives','master_success_criteria','master_project_risks','master_erp_systems'] %}active{% endif %}"
+            <a class="nav-link {% if current_page in ['organizations', 'users', 'subtypes', 'capabilities','features','languages','skills','document_templates','usecases','documentation_links','countries','master_objectives','master_success_criteria','master_project_risks','master_erp_systems','custom_project_fields'] %}active{% endif %}"
                data-bs-toggle="collapse" href="#mainDataMenu" role="button"
-               aria-expanded="{% if current_page in ['organizations', 'users', 'subtypes', 'capabilities','features','languages','skills','document_templates','usecases','documentation_links','countries','master_objectives','master_success_criteria','master_project_risks','master_erp_systems'] %}true{% else %}false{% endif %}"
+               aria-expanded="{% if current_page in ['organizations', 'users', 'subtypes', 'capabilities','features','languages','skills','document_templates','usecases','documentation_links','countries','master_objectives','master_success_criteria','master_project_risks','master_erp_systems','custom_project_fields'] %}true{% else %}false{% endif %}"
                aria-controls="mainDataMenu">
                 🗄️ Master Data
             </a>
 
             <!-- Submenu: Automatically opens if a child is the current_page -->
-            <ul class="collapse {% if current_page in ['organizations', 'users', 'subtypes', 'capabilities','features','languages','skills','document_templates','usecases','documentation_links','countries','master_objectives','master_success_criteria','master_project_risks','master_erp_systems'] %}show{% endif %} nav flex-column submenu" id="mainDataMenu">
+            <ul class="collapse {% if current_page in ['organizations', 'users', 'subtypes', 'capabilities','features','languages','skills','document_templates','usecases','documentation_links','countries','master_objectives','master_success_criteria','master_project_risks','master_erp_systems','custom_project_fields'] %}show{% endif %} nav flex-column submenu" id="mainDataMenu">
                 <li class="nav-item">
                     <a class="nav-link {% if current_page == 'languages' %}active{% endif %}" href="/languages-page">🌐 Languages</a>
                 </li>
@@ -43,7 +43,7 @@
                     <a class="nav-link {% if current_page == 'organizations' %}active{% endif %}" href="/">🏢 Organizations</a>
                 </li>
                  <li class="nav-item">
-                    <a class="nav-link {% if current_page == 'subtypes' %}active{% endif %}" href="/subtypes-page">⚙️ Subtypes</a>
+                    <a class="nav-link {% if current_page == 'subtypes' %}active{% endif %}" href="/subtypes-page">🏷️ Roles</a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link {% if current_page == 'users' %}active{% endif %}" href="/users-page">👥 Users</a>
@@ -93,6 +93,9 @@
                 <li class="nav-item">
                     <a class="nav-link {% if current_page == 'master_erp_systems' %}active{% endif %}" href="/master-erp-systems-page">🖥️ ERP Systems</a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_page == 'custom_project_fields' %}active{% endif %}" href="/custom-project-fields-page">🧩 Custom Fields</a>
+                </li>
 
             </ul>
         </li>
@@ -116,19 +119,39 @@
         </li>
 
         <!-- ========================================== -->
-        <!-- MAIN MENU 3: Integrations                 -->
+        <!-- MAIN MENU 3: CSM                          -->
         <!-- ========================================== -->
         <li class="nav-item">
-            <a class="nav-link {% if current_page in ['integrations'] %}active{% endif %}"
+            <a class="nav-link {% if current_page in ['csm'] %}active{% endif %}"
+               data-bs-toggle="collapse" href="#csmMenu" role="button"
+               aria-expanded="{% if current_page in ['csm'] %}true{% else %}false{% endif %}"
+               aria-controls="csmMenu">
+                💼 CSM
+            </a>
+            <ul class="collapse {% if current_page in ['csm'] %}show{% endif %} nav flex-column submenu" id="csmMenu">
+                <li class="nav-item">
+                    <a class="nav-link {% if current_page == 'csm' %}active{% endif %}" href="/csm-page">📋 Accounts</a>
+                </li>
+            </ul>
+        </li>
+
+        <!-- ========================================== -->
+        <!-- MAIN MENU 4: Integrations                 -->
+        <!-- ========================================== -->
+        <li class="nav-item">
+            <a class="nav-link {% if current_page in ['integrations', 'credentials'] %}active{% endif %}"
                data-bs-toggle="collapse" href="#integrationsMenu" role="button"
-               aria-expanded="{% if current_page in ['integrations'] %}true{% else %}false{% endif %}"
+               aria-expanded="{% if current_page in ['integrations', 'credentials'] %}true{% else %}false{% endif %}"
                aria-controls="integrationsMenu">
                 🔗 Integrations
             </a>
 
-            <ul class="collapse {% if current_page in ['integrations'] %}show{% endif %} nav flex-column submenu" id="integrationsMenu">
+            <ul class="collapse {% if current_page in ['integrations', 'credentials'] %}show{% endif %} nav flex-column submenu" id="integrationsMenu">
                 <li class="nav-item">
                     <a class="nav-link {% if current_page == 'integrations' %}active{% endif %}" href="/integrations-page">⚙️ Configure</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_page == 'credentials' %}active{% endif %}" href="/credentials-page">🔐 Credentials</a>
                 </li>
             </ul>
         </li>

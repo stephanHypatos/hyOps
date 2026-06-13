@@ -57,13 +57,12 @@ class ProjectBase(BaseModel):
     approx_supplier_customer_count: Optional[int] = None
 
     # Technical Integration
-    target_erp: Optional[str] = None
+    target_erp: list[str] = []
     sap_addon_concerns: Optional[str] = None
     current_workflow: Optional[str] = None
     existing_services: Optional[str] = None
     document_receipt_channels: list[str] = []
     data_points_current: Optional[str] = None
-    number_erp_systems: Optional[int] = None
 
     # Document Processing Discovery
     users_work_in_studio: Optional[str] = None
@@ -122,6 +121,7 @@ class ProjectBase(BaseModel):
     current_kpis: Optional[str] = None
     verification_team_kpis: Optional[str] = None
     special_document_handling: Optional[str] = None
+    custom_answers: dict = {}
 
     # Document Paths
     sow_markdown_path: Optional[str] = None
@@ -190,13 +190,12 @@ class ProjectUpdate(BaseModel):
     approx_supplier_customer_count: Optional[int] = None
 
     # Technical Integration
-    target_erp: Optional[str] = None
+    target_erp: Optional[list[str]] = None
     sap_addon_concerns: Optional[str] = None
     current_workflow: Optional[str] = None
     existing_services: Optional[str] = None
     document_receipt_channels: Optional[list[str]] = None
     data_points_current: Optional[str] = None
-    number_erp_systems: Optional[int] = None
 
     # Document Processing Discovery
     users_work_in_studio: Optional[str] = None
@@ -255,7 +254,8 @@ class ProjectUpdate(BaseModel):
     current_kpis: Optional[str] = None
     verification_team_kpis: Optional[str] = None
     special_document_handling: Optional[str] = None
-    
+    custom_answers: Optional[dict] = None
+
     # Document Paths
     sow_markdown_path: Optional[str] = None
     sow_docx_path: Optional[str] = None

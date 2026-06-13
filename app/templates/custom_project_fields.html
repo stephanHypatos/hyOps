@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Project Fields</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        .sidebar { width: 260px; min-height: 100vh; }
+        .sidebar .nav-link { color: rgba(255,255,255,0.75); border-radius: 5px; margin-bottom: 5px; }
+        .sidebar .nav-link:hover { color: #fff; background-color: rgba(255,255,255,0.1); }
+        .sidebar .nav-link.active { color: #fff; background-color: #0d6efd; }
+        .sidebar .submenu { padding-left: 1rem; }
+        .sidebar .nav-link[data-bs-toggle="collapse"]::after { content: '\25BC'; float: right; font-size: 0.7rem; margin-top: 0.3rem; transition: transform 0.2s ease-in-out; }
+        .sidebar .nav-link[data-bs-toggle="collapse"][aria-expanded="false"]::after { transform: rotate(-90deg); }
+        @media (max-width: 767.98px) { .sidebar { width: 100%; min-height: auto; } }
+        .question-row:hover { background-color: #f8f9fa; }
+    </style>
+</head>
+<body class="bg-light">
+<div class="d-flex flex-md-row flex-column" x-data="mgr()" x-init="load()">
+    {% include "components/sidebar.html" %}
+    <main class="flex-grow-1 p-4">
+        <div class="d-flex align-items-center mb-2 gap-3">
+            <h1 class="mb-0">🧩 Custom Project Fields</h1>
+            <span class="badge bg-secondary fs-6" x-text="sections.length + ' sections'"></span>
+        </div>
+        <p class="text-muted mb-4">Define extra sections and questions that appear at the bottom of the project form. Leave Use Case blank for sections that appear on all projects (global), or pick a use case to show a section only when that use case is selected.</p>
+
+        <!-- Add Section form -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 d-flex align-items-center gap-2"><i class="bi bi-plus-circle text-primary"></i> Add Section</h5>
+            </div>
+            <div class="card-body">
+                <form @submit.prevent="addSection()">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-5">
+                            <label class="form-label fw-semibold">Section Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" x-model="newSection.name" placeholder="e.g. Customer Specifics" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Use Case <span class="text-muted small">(optional — blank = global)</span></label>
+                            <select class="form-select" id="newSectionUCSelect">
+                                <option value="">— Global (all projects) —</option>
+                                <template x-for="uc in usecases" :key="uc.id">
+                                    <option :value="uc.id" x-text="uc.name"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label fw-semibold">Order</label>
+                            <input type="number" class="form-control" x-model.number="newSection.order" min="0">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary w-100" :disabled="savingSection">
+                                <span x-show="!savingSection">+ Add Section</span>
+                                <span x-show="savingSection">Saving…</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div x-show="sectionMsg" class="mt-2 small" :class="sectionOk ? 'text-success' : 'text-danger'" x-text="sectionMsg"></div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div x-show="loading" class="text-center text-muted py-5">Loading…</div>
+        <div x-show="!loading && sections.length === 0" class="text-center text-muted py-5">No sections yet. Add one above.</div>
+
+        <!-- Section cards -->
+        <template x-for="section in sections" :key="section.id">
+            <div class="card shadow-sm mb-4">
+                <!-- Section header -->
+                <div class="card-header bg-white d-flex align-items-center gap-2">
+                    <template x-if="editSectionId !== section.id">
+                        <div class="d-flex align-items-center gap-2 flex-grow-1">
+                            <span class="fw-semibold fs-5" x-text="section.name"></span>
+                            <span class="badge bg-light text-muted border small" x-text="'order: ' + section.order"></span>
+                            <span class="badge bg-secondary ms-1" x-text="section.questions.length + ' questions'"></span>
+                            <template x-if="section.use_case_id">
+                                <span class="badge bg-info text-dark ms-1" x-text="'UC: ' + getUsecase(section.use_case_id)"></span>
+                            </template>
+                            <template x-if="!section.use_case_id">
+                                <span class="badge bg-success ms-1">Global</span>
+                            </template>
+                        </div>
+                    </template>
+                    <template x-if="editSectionId === section.id">
+                        <div class="d-flex align-items-center gap-2 flex-grow-1 flex-wrap">
+                            <input type="text" class="form-control form-control-sm" style="max-width:220px" x-model="editSectionForm.name">
+                            <select class="form-select form-select-sm" style="max-width:200px" id="editSectionUCSelect">
+                                <option value="" :selected="!editSectionForm.use_case_id">— Global —</option>
+                                <template x-for="uc in usecases" :key="uc.id">
+                                    <option :value="uc.id" :selected="editSectionForm.use_case_id === uc.id" x-text="uc.name"></option>
+                                </template>
+                            </select>
+                            <input type="number" class="form-control form-control-sm" style="max-width:70px" x-model.number="editSectionForm.order" min="0">
+                            <button class="btn btn-sm btn-warning" @click="saveSection(section.id)">✓ Save</button>
+                            <button class="btn btn-sm btn-outline-secondary" @click="editSectionId=null">Cancel</button>
+                        </div>
+                    </template>
+                    <div class="ms-auto d-flex gap-1">
+                        <button class="btn btn-sm btn-outline-secondary" @click="startEditSection(section)" x-show="editSectionId !== section.id"><i class="bi bi-pencil"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" @click="deleteSection(section.id)"><i class="bi bi-trash"></i></button>
+                        <button class="btn btn-sm btn-outline-primary" @click="addQuestionForId = addQuestionForId===section.id ? null : section.id">
+                            <i class="bi" :class="addQuestionForId===section.id ? 'bi-x' : 'bi-plus'"></i> Question
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Add question inline form -->
+                <div x-show="addQuestionForId === section.id" x-transition class="card-body border-bottom bg-light">
+                    <h6 class="text-muted mb-3">Add Question to "<span x-text="section.name"></span>"</h6>
+                    <form @submit.prevent="addQuestion(section.id)">
+                        <div class="row g-3">
+                            <div class="col-md-5">
+                                <label class="form-label fw-semibold">Label <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" x-model="newQuestion.label" placeholder="e.g. Budget Range" required>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label fw-semibold">Type</label>
+                                <select class="form-select" x-model="newQuestion.type">
+                                    <option value="text">Text</option>
+                                    <option value="textarea">Textarea</option>
+                                    <option value="number">Number</option>
+                                    <option value="select">Select</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3" x-show="newQuestion.type === 'select'">
+                                <label class="form-label fw-semibold">Options <span class="text-muted small">(comma-separated)</span></label>
+                                <input type="text" class="form-control" x-model="newQuestion.options" placeholder="Option A, Option B">
+                            </div>
+                            <div class="col-md-1">
+                                <label class="form-label fw-semibold">Order</label>
+                                <input type="number" class="form-control" x-model.number="newQuestion.order" min="0">
+                            </div>
+                            <div class="col-md-1 d-flex align-items-end">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" x-model="newQuestion.required" id="reqCheck">
+                                    <label class="form-check-label small" for="reqCheck">Req.</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row g-3 mt-0">
+                            <div class="col-md-8">
+                                <label class="form-label fw-semibold">Help Text <span class="text-muted small">(optional)</span></label>
+                                <input type="text" class="form-control" x-model="newQuestion.help_text" placeholder="Hint shown below the field">
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <button type="submit" class="btn btn-primary me-2" :disabled="savingQuestion">
+                                    <span x-show="!savingQuestion">+ Add Question</span>
+                                    <span x-show="savingQuestion">Saving…</span>
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" @click="resetNewQuestion(); addQuestionForId=null">Cancel</button>
+                            </div>
+                        </div>
+                        <div x-show="questionMsg" class="mt-2 small" :class="questionOk ? 'text-success' : 'text-danger'" x-text="questionMsg"></div>
+                    </form>
+                </div>
+
+                <!-- Questions table -->
+                <div class="card-body p-0">
+                    <div x-show="section.questions.length === 0 && addQuestionForId !== section.id" class="text-muted text-center py-3 small">No questions yet — click "+ Question" to add one.</div>
+                    <div x-show="section.questions.length > 0" class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width:30px" class="text-muted">#</th>
+                                    <th>Label</th>
+                                    <th style="width:90px">Type</th>
+                                    <th>Options / Help</th>
+                                    <th style="width:60px" class="text-center">Req.</th>
+                                    <th style="width:100px"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="q in section.questions" :key="q.id">
+                                    <tr class="question-row">
+                                        <template x-if="editQuestionId !== q.id">
+                                            <td class="text-muted small" x-text="q.order"></td>
+                                        </template>
+                                        <template x-if="editQuestionId !== q.id">
+                                            <td class="fw-semibold" x-text="q.label"></td>
+                                        </template>
+                                        <template x-if="editQuestionId !== q.id">
+                                            <td><span class="badge bg-light text-dark border" x-text="q.type"></span></td>
+                                        </template>
+                                        <template x-if="editQuestionId !== q.id">
+                                            <td class="small text-muted">
+                                                <span x-show="q.type === 'select'" x-text="q.options.join(', ')"></span>
+                                                <span x-show="q.type !== 'select'" x-text="q.help_text || '—'"></span>
+                                            </td>
+                                        </template>
+                                        <template x-if="editQuestionId !== q.id">
+                                            <td class="text-center"><i class="bi" :class="q.required ? 'bi-check-circle-fill text-success' : 'bi-circle text-muted'"></i></td>
+                                        </template>
+                                        <!-- Edit row -->
+                                        <template x-if="editQuestionId === q.id">
+                                            <td colspan="5" class="py-2 px-3">
+                                                <div class="row g-2 align-items-end">
+                                                    <div class="col-md-4">
+                                                        <input type="text" class="form-control form-control-sm" x-model="editQuestionForm.label" placeholder="Label">
+                                                    </div>
+                                                    <div class="col-md-2">
+                                                        <select class="form-select form-select-sm" x-model="editQuestionForm.type">
+                                                            <option value="text">Text</option>
+                                                            <option value="textarea">Textarea</option>
+                                                            <option value="number">Number</option>
+                                                            <option value="select">Select</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-3" x-show="editQuestionForm.type === 'select'">
+                                                        <input type="text" class="form-control form-control-sm" x-model="editQuestionForm.options" placeholder="Option A, Option B">
+                                                    </div>
+                                                    <div class="col-md-3" x-show="editQuestionForm.type !== 'select'">
+                                                        <input type="text" class="form-control form-control-sm" x-model="editQuestionForm.help_text" placeholder="Help text">
+                                                    </div>
+                                                    <div class="col-auto">
+                                                        <input type="number" class="form-control form-control-sm" style="width:60px" x-model.number="editQuestionForm.order" min="0">
+                                                    </div>
+                                                    <div class="col-auto d-flex align-items-center gap-1">
+                                                        <input type="checkbox" class="form-check-input" x-model="editQuestionForm.required">
+                                                        <label class="small">Req.</label>
+                                                    </div>
+                                                    <div class="col-auto d-flex gap-1">
+                                                        <button class="btn btn-sm btn-warning" @click="saveQuestion(q.id)">✓</button>
+                                                        <button class="btn btn-sm btn-outline-secondary" @click="editQuestionId=null">✕</button>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </template>
+                                        <template x-if="editQuestionId !== q.id">
+                                            <td class="text-end pe-3">
+                                                <button class="btn btn-sm btn-outline-secondary me-1" @click="startEditQuestion(q)"><i class="bi bi-pencil"></i></button>
+                                                <button class="btn btn-sm btn-outline-danger" @click="deleteQuestion(q.id, section.id)"><i class="bi bi-trash"></i></button>
+                                            </td>
+                                        </template>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function mgr() {
+    return {
+        sections: [],
+        usecases: [],
+        loading: true,
+        // section add
+        newSection: { name: '', order: 0, use_case_id: '' },
+        savingSection: false,
+        sectionMsg: '',
+        sectionOk: true,
+        // section edit
+        editSectionId: null,
+        editSectionForm: { name: '', order: 0, use_case_id: '' },
+        // question add
+        addQuestionForId: null,
+        newQuestion: { label: '', type: 'text', options: '', required: false, order: 0, help_text: '' },
+        savingQuestion: false,
+        questionMsg: '',
+        questionOk: true,
+        // question edit
+        editQuestionId: null,
+        editQuestionForm: { label: '', type: 'text', options: '', required: false, order: 0, help_text: '' },
+
+        async load() {
+            this.loading = true;
+            try {
+                const [sectionsRes, ucRes] = await Promise.all([
+                    fetch('/custom-sections/with-questions?include_all=true'),
+                    fetch('/usecase/usecases'),
+                ]);
+                this.sections = await sectionsRes.json();
+                this.usecases = ucRes.ok ? await ucRes.json() : [];
+            } catch(e) {} finally { this.loading = false; }
+        },
+
+        getUsecase(id) {
+            const uc = this.usecases.find(u => u.id === id);
+            return uc ? uc.name : id;
+        },
+
+        // ── Sections ──────────────────────────────────────────────
+        async addSection() {
+            this.savingSection = true; this.sectionMsg = '';
+            try {
+                const payload = {
+                    name: this.newSection.name,
+                    order: this.newSection.order,
+                    use_case_id: document.getElementById('newSectionUCSelect')?.value || null,
+                };
+                const r = await fetch('/custom-sections/', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const d = await r.json();
+                if (r.ok) {
+                    this.sectionOk = true; this.sectionMsg = '✓ Section added';
+                    this.newSection = { name: '', order: 0, use_case_id: '' };
+                    const ucSel = document.getElementById('newSectionUCSelect'); if (ucSel) ucSel.value = '';
+                    await this.load();
+                } else { this.sectionOk = false; this.sectionMsg = '✗ ' + (d.detail || 'Error'); }
+            } catch(e) { this.sectionOk = false; this.sectionMsg = '✗ Network error'; }
+            finally { this.savingSection = false; }
+        },
+        startEditSection(s) {
+            this.editSectionId = s.id;
+            this.editSectionForm = { name: s.name, order: s.order, use_case_id: s.use_case_id || '' };
+            this.$nextTick(() => {
+                const el = document.getElementById('editSectionUCSelect');
+                if (el) el.value = s.use_case_id || '';
+            });
+        },
+        async saveSection(id) {
+            try {
+                const payload = {
+                    name: this.editSectionForm.name,
+                    order: this.editSectionForm.order,
+                    use_case_id: document.getElementById('editSectionUCSelect')?.value || null,
+                };
+                const r = await fetch(`/custom-sections/${id}`, {
+                    method: 'PATCH',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                if (r.ok) { this.editSectionId = null; await this.load(); }
+            } catch(e) {}
+        },
+        async deleteSection(id) {
+            if (!confirm('Delete this section and all its questions?')) return;
+            await fetch(`/custom-sections/${id}`, { method: 'DELETE' });
+            await this.load();
+        },
+
+        // ── Questions ─────────────────────────────────────────────
+        resetNewQuestion() {
+            this.newQuestion = { label: '', type: 'text', options: '', required: false, order: 0, help_text: '' };
+            this.questionMsg = '';
+        },
+        async addQuestion(sectionId) {
+            this.savingQuestion = true; this.questionMsg = '';
+            const payload = {
+                section_id: sectionId,
+                label: this.newQuestion.label,
+                type: this.newQuestion.type,
+                options: this.newQuestion.type === 'select'
+                    ? this.newQuestion.options.split(',').map(s => s.trim()).filter(Boolean)
+                    : [],
+                required: this.newQuestion.required,
+                order: this.newQuestion.order,
+                help_text: this.newQuestion.help_text || null,
+            };
+            try {
+                const r = await fetch('/custom-questions/', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const d = await r.json();
+                if (r.ok) {
+                    this.questionOk = true; this.questionMsg = '✓ Question added';
+                    this.resetNewQuestion();
+                    this.addQuestionForId = null;
+                    await this.load();
+                } else { this.questionOk = false; this.questionMsg = '✗ ' + (d.detail || 'Error'); }
+            } catch(e) { this.questionOk = false; this.questionMsg = '✗ Network error'; }
+            finally { this.savingQuestion = false; }
+        },
+        startEditQuestion(q) {
+            this.editQuestionId = q.id;
+            this.editQuestionForm = {
+                label: q.label, type: q.type,
+                options: q.options.join(', '),
+                required: q.required, order: q.order,
+                help_text: q.help_text || '',
+            };
+        },
+        async saveQuestion(id) {
+            const payload = {
+                label: this.editQuestionForm.label,
+                type: this.editQuestionForm.type,
+                options: this.editQuestionForm.type === 'select'
+                    ? this.editQuestionForm.options.split(',').map(s => s.trim()).filter(Boolean)
+                    : [],
+                required: this.editQuestionForm.required,
+                order: this.editQuestionForm.order,
+                help_text: this.editQuestionForm.help_text || null,
+            };
+            try {
+                const r = await fetch(`/custom-questions/${id}`, {
+                    method: 'PATCH',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                if (r.ok) { this.editQuestionId = null; await this.load(); }
+            } catch(e) {}
+        },
+        async deleteQuestion(id, sectionId) {
+            if (!confirm('Delete this question?')) return;
+            await fetch(`/custom-questions/${id}`, { method: 'DELETE' });
+            await this.load();
+        },
+    };
+}
+</script>
+</body>
+</html>
