@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from .routers import organization, user, subtype, capability, feature, skill, language, document_template, project, usecase
 from .routers import metabase, teams, slack, jira
-from .routers import documentation_link, smtp_config, master_data, custom_questions, csm, credentials, studio_clusters
+from .routers import documentation_link, smtp_config, master_data, custom_questions, csm, credentials, studio_clusters, demo
 
 # Single router to group all api routers
 master_router = APIRouter()
@@ -25,6 +25,7 @@ master_router.include_router(custom_questions.router)
 master_router.include_router(csm.router)
 master_router.include_router(credentials.router)
 master_router.include_router(studio_clusters.router)
+master_router.include_router(demo.router)
 
 # Integration routers
 master_router.include_router(metabase.router)

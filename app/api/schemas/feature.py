@@ -20,11 +20,9 @@ class FeatureBase(BaseModel):
     capability_id: UUID
     name: str
     service_description: str
-    requirement_description: str
-    solution_description: str
     deliverables: str
     scope_type: ScopeType
-    owner_id: UUID
+    owner_id: Optional[UUID] = None
     scoping_questionnaire: bool
     reference_documentation: Optional[str] = None
     included_in_ootb: bool
@@ -42,8 +40,6 @@ class FeatureUpdate(BaseModel):
     capability_id: Optional[UUID] = None
     name: Optional[str] = None
     service_description: Optional[str] = None
-    requirement_description: Optional[str] = None
-    solution_description: Optional[str] = None
     deliverables: Optional[str] = None
     scope_type: Optional[ScopeType] = None
     owner_id: Optional[UUID] = None

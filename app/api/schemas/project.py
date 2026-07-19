@@ -314,6 +314,12 @@ class UsecaseRead(BaseModel):
     usecase_id: UUID
 
 
+# ===================== Custom Feature M2M Schemas =====================
+
+class ProjectFeatureAssign(BaseModel):
+    feature_id: UUID
+
+
 
 # ===================== Template-Based Generation Schemas =====================
 

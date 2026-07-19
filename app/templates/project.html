@@ -373,6 +373,7 @@
 
             <ul class="nav nav-tabs mb-4">
                 <li class="nav-item"><a class="nav-link" :class="activeTab === 'stakeholders' ? 'active' : ''" href="#" @click.prevent="activeTab = 'stakeholders'">👥 Stakeholders</a></li>
+                <li class="nav-item"><a class="nav-link" :class="activeTab === 'features' ? 'active' : ''" href="#" @click.prevent="activeTab = 'features'">🧩 Custom Features</a></li>
                 <li class="nav-item"><a class="nav-link" :class="activeTab === 'documents' ? 'active' : ''" href="#" @click.prevent="activeTab = 'documents'">📄 Documents</a></li>
             </ul>
 
@@ -398,6 +399,52 @@
                                 <tr x-show="loadingStakeholders"><td colspan="4" class="text-center text-muted py-4">Loading...</td></tr>
                                 <tr x-show="!loadingStakeholders && stakeholders.length === 0"><td colspan="4" class="text-center text-muted py-4">No stakeholders assigned.</td></tr>
                                 <template x-for="sh in stakeholders" :key="sh.user_id"><tr><td class="fw-semibold" x-text="sh.first_name + ' ' + sh.last_name"></td><td class="small text-muted" x-text="sh.email"></td><td><span class="badge badge-role" :class="getRoleBadgeClass(sh.role)" x-text="formatRoleName(sh.role)"></span></td><td><button class="btn btn-sm btn-outline-danger" @click="removeStakeholder(sh.user_id)">Remove</button></td></tr></template>
+                            </tbody></table></div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- TAB: CUSTOM FEATURES                       -->
+            <!-- ========================================== -->
+            <div x-show="activeTab === 'features'">
+                <div class="alert alert-info small">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Custom features are attached <strong>directly to this project</strong>, independent of the use case.
+                    Use them for customer-specific features that should not auto-apply to every project using the same use case.
+                    Create features first under <a href="/features-page">Master Data → Features</a>.
+                </div>
+                <div class="row">
+                    <div class="col-md-5">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-white"><h5 class="mb-0">Add Custom Feature</h5></div>
+                            <div class="card-body">
+                                <form @submit.prevent="addProjectFeature()">
+                                    <div class="mb-3">
+                                        <label class="form-label">Select Feature</label>
+                                        <select class="form-select" x-model="featureForm.feature_id" required>
+                                            <option value="" disabled>Choose Feature...</option>
+                                            <template x-for="f in availableFeatures" :key="f.id">
+                                                <option :value="f.id" x-text="f.name"></option>
+                                            </template>
+                                        </select>
+                                        <div class="form-text" x-show="availableFeatures.length === 0">
+                                            All features are already attached, or none exist yet.
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100" :disabled="!featureForm.feature_id">Attach to Project</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-7">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-white d-flex justify-content-between align-items-center"><h5 class="mb-0">Attached Custom Features</h5><span class="badge bg-secondary" x-text="projectFeatures.length + ' attached'"></span></div>
+                            <div class="card-body p-0"><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>Feature</th><th>Capability</th><th>Scope</th><th style="width:100px">Action</th></tr></thead><tbody>
+                                <tr x-show="loadingProjectFeatures"><td colspan="4" class="text-center text-muted py-4">Loading...</td></tr>
+                                <tr x-show="!loadingProjectFeatures && projectFeatures.length === 0"><td colspan="4" class="text-center text-muted py-4">No custom features attached.</td></tr>
+                                <template x-for="f in projectFeatures" :key="f.id"><tr><td class="fw-semibold" x-text="f.name"></td><td class="small text-muted" x-text="f.capability_name || '—'"></td><td><span class="badge bg-info text-capitalize" x-text="f.scope_type ? f.scope_type.replace('_', ' ') : ''"></span></td><td><button class="btn btn-sm btn-outline-danger" @click="removeProjectFeature(f.id)">Remove</button></td></tr></template>
                             </tbody></table></div></div>
                         </div>
                     </div>
@@ -586,12 +633,20 @@
             selectedProject: null, activeTab: 'stakeholders',
             stakeholders: [], stakeholderForm: { user_id: '', role: '' }, loadingStakeholders: false,
             selectedUsecaseFeatures: [],
+            allFeatures: [], projectFeatures: [], featureForm: { feature_id: '' }, loadingProjectFeatures: false,
 
             apiBase: "/project",
             orgApi: "/organization",
             userApi: "/user",
             usecaseApi: "/usecase",
+            featureApi: "/feature",
             templateApi: "/document-template",
+
+            // Master features not yet attached to this project
+            get availableFeatures() {
+                const attached = new Set(this.projectFeatures.map(f => f.id));
+                return this.allFeatures.filter(f => !attached.has(f.id));
+            },
 
             get activeDocTemplates() {
                 return this.docTemplates.filter(t => t.is_active === true);
@@ -722,6 +777,7 @@
             async initData() {
                 await Promise.all([
                     this.fetchOrganizations(), this.fetchUsers(), this.fetchUsecases(), this.fetchDocTemplates(),
+                    this.fetchAllFeatures(),
                     this.fetchCountries(), this.fetchMasterObjectives(), this.fetchMasterSuccessCriteria(),
                     this.fetchMasterProjectRisks(), this.fetchMasterERPSystems(), this.fetchCustomSections()
                 ]);
@@ -738,6 +794,10 @@
             async fetchMasterERPSystems() { try { const r = await fetch('/master-erp-systems/'); this.masterERPSystems = await r.json(); } catch(e) {} },
             async fetchCustomSections(useCaseId) { try { const url = useCaseId ? `/custom-sections/with-questions?use_case_id=${useCaseId}` : '/custom-sections/with-questions'; const r = await fetch(url); this.customSections = await r.json(); } catch(e) {} },
             async loadUsecaseFeatures(usecaseId) { this.selectedUsecaseFeatures = []; if (!usecaseId) return; try { const res = await fetch(`${this.usecaseApi}/${usecaseId}/features`); if (!res.ok) throw new Error(); this.selectedUsecaseFeatures = await res.json(); } catch (e) {} },
+            async fetchAllFeatures() { try { const res = await fetch(`${this.featureApi}/features`); if (!res.ok) throw new Error(); this.allFeatures = await res.json(); } catch (e) {} },
+            async fetchProjectFeatures(projectId) { this.loadingProjectFeatures = true; try { const res = await fetch(`${this.apiBase}/${projectId}/features`); if (!res.ok) throw new Error(); this.projectFeatures = await res.json(); } catch (e) {} finally { this.loadingProjectFeatures = false; } },
+            async addProjectFeature() { if (!this.selectedProject || !this.featureForm.feature_id) return; try { const res = await fetch(`${this.apiBase}/${this.selectedProject.id}/feature`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(this.featureForm) }); if (!res.ok) { const err = await res.json(); throw new Error(err.detail || "Error"); } this.featureForm = { feature_id: '' }; await this.fetchProjectFeatures(this.selectedProject.id); } catch (e) { alert(e.message); } },
+            async removeProjectFeature(featureId) { if (!confirm("Remove this custom feature from the project?")) return; try { await fetch(`${this.apiBase}/${this.selectedProject.id}/feature/${featureId}`, { method: "DELETE" }); await this.fetchProjectFeatures(this.selectedProject.id); } catch (e) {} },
 
             async submitForm() {
                 let payload = JSON.parse(JSON.stringify(this.form));
@@ -775,10 +835,11 @@
             async openProject(proj) {
                 this.selectedProject = proj; this.activeTab = 'stakeholders'; this.stakeholderForm = { user_id: '', role: '' };
                 this.selectedTemplateIds = []; this.generatedDocsList = [];
-                // Only fetch stakeholders. We do NOT fetch old generated documents anymore.
-                await this.fetchStakeholders(proj.id);
+                this.featureForm = { feature_id: '' }; this.projectFeatures = [];
+                // Only fetch stakeholders + custom features. We do NOT fetch old generated documents anymore.
+                await Promise.all([this.fetchStakeholders(proj.id), this.fetchProjectFeatures(proj.id)]);
             },
-            closeProject() { this.selectedProject = null; this.stakeholders = []; this.generatedDocsList = []; },
+            closeProject() { this.selectedProject = null; this.stakeholders = []; this.generatedDocsList = []; this.projectFeatures = []; },
 
             async fetchStakeholders(projectId) { this.loadingStakeholders = true; try { const res = await fetch(`${this.apiBase}/${projectId}/stakeholders`); if (!res.ok) throw new Error(); this.stakeholders = await res.json(); } catch (e) {} finally { this.loadingStakeholders = false; } },
             async addStakeholder() { if (!this.selectedProject || !this.stakeholderForm.user_id || !this.stakeholderForm.role) return; try { const res = await fetch(`${this.apiBase}/${this.selectedProject.id}/stakeholder`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(this.stakeholderForm) }); if (!res.ok) { const err = await res.json(); throw new Error(err.detail || "Error"); } this.stakeholderForm = { user_id: '', role: '' }; await this.fetchStakeholders(this.selectedProject.id); } catch (e) { alert(e.message); } },

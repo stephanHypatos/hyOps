@@ -150,6 +150,16 @@ class FeatureUsecase(SQLModel, table=True):
     usecase_id: UUID = Field(foreign_key="usecase.id", primary_key=True)
 
 
+class ProjectFeature(SQLModel, table=True):
+    """Custom features attached directly to a single project, independent of
+    use cases. Lets a customer-specific feature be scoped to one project
+    without auto-applying to every project that selects the same use case."""
+    __tablename__ = "project_feature"
+
+    project_id: UUID = Field(foreign_key="project.id", primary_key=True)
+    feature_id: UUID = Field(foreign_key="feature.id", primary_key=True)
+
+
 class UserTeamsGroup(SQLModel, table=True):
     __tablename__ = "user_teams_group"
 
@@ -532,6 +542,10 @@ class Project(SQLModel, table=True):
         link_model=ProjectUsecase,
         sa_relationship_kwargs={"lazy": "selectin"},
     )
+    custom_features: list["Feature"] = Relationship(
+        link_model=ProjectFeature,
+        sa_relationship_kwargs={"lazy": "selectin"},
+    )
     primary_usecase: Optional["Usecase"] = Relationship(
         sa_relationship_kwargs={"lazy": "selectin"},
     )
@@ -577,8 +591,6 @@ class Feature(SQLModel, table=True):
     capability_id: UUID = Field(foreign_key="capability.id")
     name: str
     service_description: str
-    requirement_description: str
-    solution_description: str
     deliverables: str
     scope_type: ScopeType
     owner_id: Optional[UUID] = Field(default=None, foreign_key="user.id")

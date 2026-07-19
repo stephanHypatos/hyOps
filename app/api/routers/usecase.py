@@ -82,8 +82,6 @@ async def get_usecase_features(usecase_id: UUID, session: SessionDep):
             capability_id=feature.capability_id,
             name=feature.name,
             service_description=feature.service_description,
-            requirement_description=feature.requirement_description,
-            solution_description=feature.solution_description,
             deliverables=feature.deliverables,
             scope_type=feature.scope_type,
             owner_id=feature.owner_id,

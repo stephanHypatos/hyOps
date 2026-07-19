@@ -8,15 +8,16 @@ from datetime import datetime
 from sqlmodel import select
 from enum import Enum
 from app.database.models import (
-    Project, ProjectStakeholder, ProjectUsecase, 
-    User, Usecase,DocumentTemplate
+    Project, ProjectStakeholder, ProjectUsecase, ProjectFeature,
+    User, Usecase, Feature, Capability, DocumentTemplate
 )
 from app.database.session import SessionDep
 from app.api.schemas.project import (
     ProjectCreate, ProjectRead, ProjectUpdate,
     StakeholderRead, StakeholderReadEnriched, StakeholderAssign,
-    UsecaseAssign, UsecaseRead, GenerateFromTemplatesRequest
+    UsecaseAssign, UsecaseRead, ProjectFeatureAssign, GenerateFromTemplatesRequest
 )
+from app.api.schemas.feature import FeatureReadWithCapability
 
 from app.config import basedir
 
@@ -179,6 +180,81 @@ async def remove_usecase(project_id: UUID, usecase_id: UUID, session: SessionDep
     return {"detail": "Usecase removed from project"}
 
 
+# ===================== Custom Feature M2M Endpoints =====================
+
+@router.get("/{project_id}/features", response_model=list[FeatureReadWithCapability])
+async def get_project_features(project_id: UUID, session: SessionDep):
+    """
+    Get custom features attached directly to this project (independent of use
+    cases), enriched with capability details. Single JOIN avoids N+1 lookups.
+    """
+    result = await session.execute(
+        select(Feature, Capability)
+        .join(Capability, Feature.capability_id == Capability.id)
+        .join(ProjectFeature, ProjectFeature.feature_id == Feature.id)
+        .where(ProjectFeature.project_id == project_id)
+    )
+    rows = result.all()
+
+    return [
+        FeatureReadWithCapability(
+            id=feature.id,
+            capability_id=feature.capability_id,
+            name=feature.name,
+            service_description=feature.service_description,
+            deliverables=feature.deliverables,
+            scope_type=feature.scope_type,
+            owner_id=feature.owner_id,
+            scoping_questionnaire=feature.scoping_questionnaire,
+            reference_documentation=feature.reference_documentation,
+            included_in_ootb=feature.included_in_ootb,
+            default_enabled=feature.default_enabled,
+            active=feature.active,
+            multiple_value=feature.multiple_value,
+            requirements=feature.requirements or [],
+            created_at=feature.created_at,
+            updated_at=feature.updated_at,
+            capability_name=capability.name,
+            capability_contract=capability.contract,
+        )
+        for feature, capability in rows
+    ]
+
+
+@router.post("/{project_id}/feature")
+async def assign_feature(project_id: UUID, data: ProjectFeatureAssign, session: SessionDep):
+    # Validate project exists
+    project = await session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Validate feature exists
+    feature = await session.get(Feature, data.feature_id)
+    if not feature:
+        raise HTTPException(status_code=404, detail="Feature not found")
+
+    # Check for duplicate
+    existing = await session.get(ProjectFeature, (project_id, data.feature_id))
+    if existing:
+        raise HTTPException(status_code=400, detail="Feature is already attached to this project")
+
+    link = ProjectFeature(project_id=project_id, feature_id=data.feature_id)
+    session.add(link)
+    await session.commit()
+    await session.refresh(link)
+    return link
+
+
+@router.delete("/{project_id}/feature/{feature_id}")
+async def remove_feature(project_id: UUID, feature_id: UUID, session: SessionDep):
+    link = await session.get(ProjectFeature, (project_id, feature_id))
+    if not link:
+        raise HTTPException(status_code=404, detail="Feature not attached to this project")
+    await session.delete(link)
+    await session.commit()
+    return {"detail": "Feature removed from project"}
+
+
 
 
 
@@ -193,7 +269,7 @@ FEATURE_SKIP = {
     "id", "capability_id", "owner_id", "created_at", "updated_at", 
     "multiple_value", "scoping_questionnaire", "reference_documentation", 
     "included_in_ootb", "default_enabled", "active", "capability", "owner", 
-    "scope_specifications", "cost_drivers", "feature_efforts", "usecases", "requirements"
+    "scope_specifications", "cost_drivers", "feature_efforts", "usecases"
 }
 
 
@@ -272,9 +348,21 @@ def build_render_context(project: Project) -> dict:
                 "subtype": str(getattr(user.subtype, 'name', '')) if hasattr(user, 'subtype') and user.subtype else '',
             })
 
-    # NEW: Extract features from primary usecase
+    # Extract features from the primary usecase, then merge in any custom
+    # features attached directly to the project. De-duplicate by feature id so
+    # a feature that is both in the usecase and attached directly appears once.
+    seen_feature_ids = set()
+
     if project.primary_usecase and project.primary_usecase.features:
         for feature in project.primary_usecase.features:
+            seen_feature_ids.add(feature.id)
+            context["features"].append(_extract_fields(feature, FEATURE_SKIP))
+
+    if project.custom_features:
+        for feature in project.custom_features:
+            if feature.id in seen_feature_ids:
+                continue
+            seen_feature_ids.add(feature.id)
             context["features"].append(_extract_fields(feature, FEATURE_SKIP))
 
     return context
@@ -282,36 +370,69 @@ def build_render_context(project: Project) -> dict:
 
 
 
-def replace_placeholders(markdown_content: str, context: dict) -> str:
-    """Pure regex replacement for {{project.name}}, {{customer.email}}, and #loops."""
-    
-    # 1. Handle list loops first: {{#features}} ... {{feature.name}} ... {{/features}}
-    loop_pattern = r'\{\{#(\w+)\}\}(.*?)\{\{/\1\}\}'
-    
+LOOP_PATTERN = r'\{\{#(\w+)\}\}(.*?)\{\{/\1\}\}'
+
+
+def _render_loops(template: str, context: dict) -> str:
+    """
+    Render {{#list}} ... {{/list}} blocks.
+
+    Recurses, so loops can be nested — e.g. a {{#requirements}} block inside a
+    {{#features}} block. The inner loop is resolved against the current outer
+    item, which is how per-feature requirements get rendered:
+
+        {{#features}}
+        ### {{feature.name}}
+        {{#requirements}}
+        - {{requirement.requirement}}: {{requirement.solution}}
+        {{/requirements}}
+        {{/features}}
+    """
     def loop_replacer(match):
         list_key = match.group(1)
         inner_template = match.group(2).strip()
         items = _resolve_dot_path(list_key, context)
-        
+
         if not isinstance(items, list):
             return ""
-        
+
+        # Handle singular key (e.g. features -> feature)
+        singular_key = list_key[:-1] if list_key.endswith('s') else list_key
         rendered_items = []
+
         for item in items:
-            if isinstance(item, dict):
-                item_rendered = inner_template
-                # Replace nested variables like {{feature.name}} or bare {{name}}
-                for k, v in item.items():
+            if not isinstance(item, dict):
+                continue
+
+            # Resolve any nested loops first, scoped to this item
+            item_rendered = _render_loops(inner_template, item)
+
+            # Then replace scalars like {{feature.name}} or bare {{name}}
+            for k, v in item.items():
+                if isinstance(v, dict):
+                    continue
+                if isinstance(v, list):
+                    # A list of objects is rendered by a nested loop, not inline
+                    if v and isinstance(v[0], dict):
+                        continue
+                    val = ", ".join(str(x) for x in v)
+                else:
                     val = str(v) if v is not None else ""
-                    # Handle singular key (e.g. features -> feature)
-                    singular_key = list_key[:-1] if list_key.endswith('s') else list_key
-                    item_rendered = item_rendered.replace(f'{{{{{singular_key}.{k}}}}}', val)
-                    # Handle bare key
-                    item_rendered = item_rendered.replace(f'{{{{{k}}}}}', val)
-                rendered_items.append(item_rendered)
+                item_rendered = item_rendered.replace(f'{{{{{singular_key}.{k}}}}}', val)
+                item_rendered = item_rendered.replace(f'{{{{{k}}}}}', val)
+
+            rendered_items.append(item_rendered)
+
         return "\n".join(rendered_items)
 
-    markdown_content = re.sub(loop_pattern, loop_replacer, markdown_content, flags=re.DOTALL)
+    return re.sub(LOOP_PATTERN, loop_replacer, template, flags=re.DOTALL)
+
+
+def replace_placeholders(markdown_content: str, context: dict) -> str:
+    """Pure regex replacement for {{project.name}}, {{customer.email}}, and #loops."""
+
+    # 1. Handle list loops first (supports nesting)
+    markdown_content = _render_loops(markdown_content, context)
 
     # 2. Handle simple variables (existing logic + singular list fallback)
     def replacer(match):

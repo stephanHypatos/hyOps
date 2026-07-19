@@ -157,4 +157,54 @@
         </li>
 
     </ul>
+
+    <!-- ── Demo Data ─────────────────────────────────────── -->
+    <div class="mt-auto pt-3 border-top border-secondary" x-data="demoSeed()">
+        <p class="text-muted mb-2" style="font-size:0.7rem;text-transform:uppercase;letter-spacing:.05em">Demo Data</p>
+        <div class="d-grid gap-2">
+            <button class="btn btn-sm btn-outline-success" @click="seed()" :disabled="loading">
+                <span x-show="!loading">⚡ Populate Demo Data</span>
+                <span x-show="loading">Loading…</span>
+            </button>
+            <button class="btn btn-sm btn-outline-danger" @click="clear()" :disabled="loading">
+                🗑️ Clear Demo Data
+            </button>
+        </div>
+        <p x-show="message" x-text="message" class="mt-2 mb-0 small text-center"
+           :class="error ? 'text-danger' : 'text-success'"></p>
+    </div>
 </nav>
+
+<script>
+function demoSeed() {
+    return {
+        loading: false,
+        message: '',
+        error: false,
+        async seed() {
+            if (!confirm('Populate the database with demo data?')) return;
+            this.loading = true; this.message = ''; this.error = false;
+            try {
+                const r = await fetch('/demo/seed', { method: 'POST' });
+                const d = await r.json();
+                this.error = !r.ok;
+                this.message = d.detail || (r.ok ? 'Done!' : 'Error');
+                if (r.ok) setTimeout(() => location.reload(), 800);
+            } catch { this.error = true; this.message = 'Request failed'; }
+            this.loading = false;
+        },
+        async clear() {
+            if (!confirm('Delete all demo data? This cannot be undone.')) return;
+            this.loading = true; this.message = ''; this.error = false;
+            try {
+                const r = await fetch('/demo/seed', { method: 'DELETE' });
+                const d = await r.json();
+                this.error = !r.ok;
+                this.message = d.detail || (r.ok ? 'Cleared.' : 'Error');
+                if (r.ok) setTimeout(() => location.reload(), 800);
+            } catch { this.error = true; this.message = 'Request failed'; }
+            this.loading = false;
+        }
+    }
+}
+</script>
