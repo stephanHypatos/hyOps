@@ -89,22 +89,42 @@
                             <div class="col-md-6"><label class="form-label">Hypatos Budget (hrs)</label><input type="number" step="1" class="form-control" x-model.number="form.internal_budget_hours" min="0" placeholder="0"></div>
                         </div>
 
-                        <!-- Usecase Features Display -->
+                        <!-- Usecase Features — deselect any that are not needed for this project -->
                         <div class="row g-3 mb-3" x-show="form.primary_usecase_id && selectedUsecaseFeatures.length > 0" x-transition>
                             <div class="col-12">
                                 <div class="card border-primary bg-light">
                                     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                                         <h6 class="mb-0">Features in this Usecase</h6>
-                                        <span class="badge bg-light text-primary" x-text="selectedUsecaseFeatures.length + ' features'"></span>
+                                        <div>
+                                            <span class="badge bg-light text-primary me-2"
+                                                  x-text="includedUsecaseFeatureCount + ' of ' + selectedUsecaseFeatures.length + ' included'"></span>
+                                            <button type="button" class="btn btn-sm btn-outline-light py-0"
+                                                    @click="excludedFeatureIds = []"
+                                                    x-show="excludedFeatureIds.length > 0">Reset</button>
+                                        </div>
                                     </div>
-                                    <div class="card-body p-2" style="max-height: 200px; overflow-y: auto;">
-                                        <div class="row">
+                                    <div class="card-body p-2">
+                                        <p class="small text-muted mb-2">
+                                            These features come from the selected use case. Untick any that are not
+                                            needed for this project — they will be left out of generated documents.
+                                        </p>
+                                        <div class="row" style="max-height: 220px; overflow-y: auto;">
                                             <template x-for="feat in selectedUsecaseFeatures" :key="feat.id">
                                                 <div class="col-md-4 col-lg-3 p-1">
-                                                    <div class="card h-100 small"><div class="card-body p-2">
-                                                        <strong class="text-primary" x-text="feat.name"></strong>
-                                                        <span class="badge bg-info text-capitalize ms-1" x-text="feat.scope_type ? feat.scope_type.replace('_', ' ') : ''"></span>
-                                                    </div></div>
+                                                    <div class="card h-100 small" :class="isFeatureExcluded(feat.id) ? 'opacity-50 border-secondary' : 'border-primary'">
+                                                        <div class="card-body p-2">
+                                                            <div class="form-check mb-0">
+                                                                <input class="form-check-input" type="checkbox"
+                                                                       :id="'feat-' + feat.id"
+                                                                       :checked="!isFeatureExcluded(feat.id)"
+                                                                       @change="toggleFeatureExcluded(feat.id)">
+                                                                <label class="form-check-label" :for="'feat-' + feat.id">
+                                                                    <strong :class="isFeatureExcluded(feat.id) ? 'text-muted text-decoration-line-through' : 'text-primary'" x-text="feat.name"></strong>
+                                                                    <span class="badge bg-info text-capitalize ms-1" x-text="feat.scope_type ? feat.scope_type.replace('_', ' ') : ''"></span>
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </template>
                                         </div>
@@ -668,6 +688,7 @@
             selectedProject: null, activeTab: 'stakeholders',
             stakeholders: [], stakeholderForm: { user_id: '', role: '' }, loadingStakeholders: false,
             selectedUsecaseFeatures: [],
+            excludedFeatureIds: [],
             allFeatures: [], projectFeatures: [], featureForm: { feature_id: '' }, loadingProjectFeatures: false,
 
             apiBase: "/project",
@@ -676,6 +697,45 @@
             usecaseApi: "/usecase",
             featureApi: "/feature",
             templateApi: "/document-template",
+
+            // ========== USECASE FEATURE DESELECTION ==========
+            get includedUsecaseFeatureCount() {
+                return this.selectedUsecaseFeatures.filter(f => !this.isFeatureExcluded(f.id)).length;
+            },
+
+            isFeatureExcluded(featureId) {
+                return this.excludedFeatureIds.includes(featureId);
+            },
+
+            toggleFeatureExcluded(featureId) {
+                if (this.isFeatureExcluded(featureId)) {
+                    this.excludedFeatureIds = this.excludedFeatureIds.filter(id => id !== featureId);
+                } else {
+                    this.excludedFeatureIds = [...this.excludedFeatureIds, featureId];
+                }
+            },
+
+            async fetchExcludedFeatures(projectId) {
+                this.excludedFeatureIds = [];
+                if (!projectId) return;
+                try {
+                    const res = await fetch(`${this.apiBase}/${projectId}/excluded-features`);
+                    if (!res.ok) throw new Error();
+                    const data = await res.json();
+                    this.excludedFeatureIds = data.feature_ids || [];
+                } catch (e) { console.error("Error fetching excluded features"); }
+            },
+
+            async saveExcludedFeatures(projectId) {
+                if (!projectId) return;
+                try {
+                    await fetch(`${this.apiBase}/${projectId}/excluded-features`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ feature_ids: this.excludedFeatureIds })
+                    });
+                } catch (e) { console.error("Error saving excluded features"); }
+            },
 
             // Master features not yet attached to this project
             get availableFeatures() {
@@ -868,8 +928,11 @@
                 arrayFields.forEach(field => { if (!Array.isArray(payload[field])) payload[field] = []; });
                 if (!payload.requires_integration) payload.integration_type = "none";
                 try {
-                    if (this.isEditing) { const id = payload.id; delete payload.id; const res = await fetch(`${this.apiBase}/?id=${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); if (!res.ok) { const err = await res.json(); throw new Error(err.detail || "Error"); } } 
-                    else { delete payload.id; const res = await fetch(`${this.apiBase}/`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); if (!res.ok) { const err = await res.json(); throw new Error(err.detail || "Error"); } }
+                    let savedProjectId;
+                    if (this.isEditing) { const id = payload.id; delete payload.id; const res = await fetch(`${this.apiBase}/?id=${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); if (!res.ok) { const err = await res.json(); throw new Error(err.detail || "Error"); } savedProjectId = id; }
+                    else { delete payload.id; const res = await fetch(`${this.apiBase}/`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); if (!res.ok) { const err = await res.json(); throw new Error(err.detail || "Error"); } savedProjectId = (await res.json()).id; }
+                    // Persist which out-of-the-box features were deselected
+                    await this.saveExcludedFeatures(savedProjectId);
                     this.resetForm(); await this.fetchProjects();
                 } catch (e) { alert("Error saving project: " + e.message); }
             },
@@ -884,12 +947,13 @@
                 editData.custom_answers = (editData.custom_answers && typeof editData.custom_answers === 'object') ? editData.custom_answers : {};
                 this.form = editData;
                 if (editData.primary_usecase_id) this.loadUsecaseFeatures(editData.primary_usecase_id); this.fetchCustomSections(editData.primary_usecase_id || null);
+                this.fetchExcludedFeatures(editData.id);
             },
 
             async deleteProject(proj) { if (!confirm(`Delete ${proj.name}?`)) return; try { await fetch(`${this.apiBase}/?id=${proj.id}`, { method: "DELETE" }); await this.fetchProjects(); } catch (e) { alert("Error deleting"); } },
 
             resetForm() {
-                this.isEditing = false; this.selectedUsecaseFeatures = []; this.objectiveInput = ''; this.criteriaInput = ''; this.docTypeInput = { document_name: '', accuracy_target: 95 };
+                this.isEditing = false; this.selectedUsecaseFeatures = []; this.excludedFeatureIds = []; this.objectiveInput = ''; this.criteriaInput = ''; this.docTypeInput = { document_name: '', accuracy_target: 95 };
                 this.form = { id: '', name: '', type: 'pilot', status: 'draft', start_date: '', customer_id: '', partner_id: '', deal_winner_id: '', primary_usecase_id: '', default_duration_weeks: 4, requires_integration: 'false', integration_type: 'none', partner_budget_hours: 0, internal_budget_hours: 0, go_live_date: '', go_live_regions: [], rollout_regions: [], project_background: '', main_objectives: [], top_three_pain_points: '', language_constraints: '', project_risks: [], overall_accuracy_target: null, success_criteria: [], success_criteria_custom: '', document_types: [], annual_doc_volume_per_usecase: null, e2e_cost_per_doc: null, e2e_processing_time_mins: null, automation_improvement_percentage: null, approx_supplier_customer_count: null, target_erp: [], sap_addon_concerns: '', current_workflow: '', existing_services: '', document_receipt_channels: [], data_points_current: '', custom_answers: {} }; this.fetchCustomSections(null);
             },
 

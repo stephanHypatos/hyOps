@@ -320,6 +320,11 @@ class ProjectFeatureAssign(BaseModel):
     feature_id: UUID
 
 
+class ExcludedFeaturesSet(BaseModel):
+    """Full replacement set of use-case features this project opts out of."""
+    feature_ids: list[UUID] = []
+
+
 
 # ===================== Template-Based Generation Schemas =====================
 

@@ -866,11 +866,29 @@
             },
 
             async deleteTemplate(tmpl) {
-                if (!confirm(`Delete ${tmpl.name}?`)) return;
-                try { 
-                    await fetch(`${this.apiBase}/?id=${tmpl.id}`, { method: "DELETE" }); 
-                    await this.fetchTemplates(); 
-                } catch (e) { alert("Error deleting"); }
+                // Deleting a template also destroys every document generated from
+                // it, so surface the count before asking for confirmation.
+                let generated = { count: 0, project_count: 0 };
+                try {
+                    const res = await fetch(`${this.apiBase}/generated-count?id=${tmpl.id}`);
+                    if (res.ok) generated = await res.json();
+                } catch (e) { /* fall through to the plain prompt */ }
+
+                let message = `Delete ${tmpl.name}?`;
+                if (generated.count > 0) {
+                    message = `Delete "${tmpl.name}"?\n\n`
+                        + `WARNING: this will also permanently delete `
+                        + `${generated.count} generated document version(s) `
+                        + `across ${generated.project_count} project(s), including the files on disk.\n\n`
+                        + `This cannot be undone. To keep the history, cancel and untick "Active" instead.`;
+                }
+                if (!confirm(message)) return;
+
+                try {
+                    const res = await fetch(`${this.apiBase}/?id=${tmpl.id}`, { method: "DELETE" });
+                    if (!res.ok) { const err = await res.json(); throw new Error(err.detail || "Error"); }
+                    await this.fetchTemplates();
+                } catch (e) { alert("Error deleting template: " + e.message); }
             },
 
             resetForm() {

@@ -10,13 +10,13 @@ from enum import Enum
 from app.database.models import (
     Project, ProjectStakeholder, ProjectUsecase, ProjectFeature,
     User, Usecase, Feature, Capability, DocumentTemplate,
-    GeneratedDocument, DocumentStatus, Organization
+    GeneratedDocument, DocumentStatus, Organization, ProjectExcludedFeature
 )
 from app.database.session import SessionDep
 from app.api.schemas.project import (
     ProjectCreate, ProjectRead, ProjectUpdate,
     StakeholderRead, StakeholderReadEnriched, StakeholderAssign,
-    UsecaseAssign, UsecaseRead, ProjectFeatureAssign, GenerateFromTemplatesRequest
+    UsecaseAssign, UsecaseRead, ProjectFeatureAssign, ExcludedFeaturesSet, GenerateFromTemplatesRequest
 )
 from app.api.schemas.feature import FeatureReadWithCapability
 
@@ -256,6 +256,52 @@ async def remove_feature(project_id: UUID, feature_id: UUID, session: SessionDep
     return {"detail": "Feature removed from project"}
 
 
+# ===================== Excluded (opted-out) Feature Endpoints =================
+
+@router.get("/{project_id}/excluded-features")
+async def get_excluded_features(project_id: UUID, session: SessionDep):
+    """Feature ids this project has opted out of (deselected out-of-the-box features)."""
+    result = await session.execute(
+        select(ProjectExcludedFeature).where(ProjectExcludedFeature.project_id == project_id)
+    )
+    return {"feature_ids": [str(link.feature_id) for link in result.scalars().all()]}
+
+
+@router.put("/{project_id}/excluded-features")
+async def set_excluded_features(
+    project_id: UUID,
+    data: ExcludedFeaturesSet,
+    session: SessionDep,
+):
+    """
+    Replace the project's set of opted-out features.
+
+    Sending an empty list re-enables every out-of-the-box feature. Suits a
+    checkbox UI, where the client submits the full selection each time.
+    """
+    project = await session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    existing = (await session.execute(
+        select(ProjectExcludedFeature).where(ProjectExcludedFeature.project_id == project_id)
+    )).scalars().all()
+    existing_ids = {link.feature_id for link in existing}
+    wanted_ids = set(data.feature_ids)
+
+    for link in existing:
+        if link.feature_id not in wanted_ids:
+            await session.delete(link)
+
+    for feature_id in wanted_ids - existing_ids:
+        if not await session.get(Feature, feature_id):
+            raise HTTPException(status_code=404, detail=f"Feature {feature_id} not found")
+        session.add(ProjectExcludedFeature(project_id=project_id, feature_id=feature_id))
+
+    await session.commit()
+    return {"feature_ids": [str(fid) for fid in wanted_ids]}
+
+
 
 
 
@@ -376,13 +422,17 @@ def build_render_context(project: Project) -> dict:
                 "subtype": str(getattr(user.subtype, 'name', '')) if hasattr(user, 'subtype') and user.subtype else '',
             })
 
-    # Extract features from the primary usecase, then merge in any custom
-    # features attached directly to the project. De-duplicate by feature id so
-    # a feature that is both in the usecase and attached directly appears once.
+    # Extract features from the primary usecase, minus any the project has
+    # opted out of, then merge in custom features attached directly to the
+    # project. De-duplicate by feature id so a feature that is both in the
+    # usecase and attached directly appears once.
     seen_feature_ids = set()
+    excluded_ids = {f.id for f in (project.excluded_features or [])}
 
     if project.primary_usecase and project.primary_usecase.features:
         for feature in project.primary_usecase.features:
+            if feature.id in excluded_ids:
+                continue
             seen_feature_ids.add(feature.id)
             context["features"].append(_extract_fields(feature, FEATURE_SKIP))
 

@@ -160,6 +160,20 @@ class ProjectFeature(SQLModel, table=True):
     feature_id: UUID = Field(foreign_key="feature.id", primary_key=True)
 
 
+class ProjectExcludedFeature(SQLModel, table=True):
+    """Use-case features this project has opted out of.
+
+    Features flow into a project automatically from its primary use case. Some
+    of those out-of-the-box features are not relevant for every project, so
+    only the deviations are stored here — the default remains "all included".
+    An exclusion whose feature is not in the current use case simply has no
+    effect, so switching use case needs no special handling."""
+    __tablename__ = "project_excluded_feature"
+
+    project_id: UUID = Field(foreign_key="project.id", primary_key=True)
+    feature_id: UUID = Field(foreign_key="feature.id", primary_key=True)
+
+
 class UserTeamsGroup(SQLModel, table=True):
     __tablename__ = "user_teams_group"
 
@@ -546,12 +560,16 @@ class Project(SQLModel, table=True):
         link_model=ProjectFeature,
         sa_relationship_kwargs={"lazy": "selectin"},
     )
+    excluded_features: list["Feature"] = Relationship(
+        link_model=ProjectExcludedFeature,
+        sa_relationship_kwargs={"lazy": "selectin"},
+    )
     primary_usecase: Optional["Usecase"] = Relationship(
         sa_relationship_kwargs={"lazy": "selectin"},
     )
     generated_documents: list["GeneratedDocument"] = Relationship(
         back_populates="project",
-        sa_relationship_kwargs={"lazy": "selectin"},
+        sa_relationship_kwargs={"lazy": "selectin", "cascade": "all, delete-orphan"},
     )
     erp_connectors: list["ERPConnector"] = Relationship(
         back_populates="project",
@@ -737,7 +755,9 @@ class DocumentTemplate(SQLModel, table=True):
     )
     generated_documents: list["GeneratedDocument"] = Relationship(
         back_populates="template",
-        sa_relationship_kwargs={"lazy": "selectin"},
+        # Deleting a template also removes its generated version rows —
+        # template_id is NOT NULL, so they cannot simply be orphaned.
+        sa_relationship_kwargs={"lazy": "selectin", "cascade": "all, delete-orphan"},
     )
 
 

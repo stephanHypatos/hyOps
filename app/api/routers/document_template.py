@@ -1,3 +1,4 @@
+import os
 import re
 from datetime import datetime
 from uuid import UUID
@@ -8,6 +9,7 @@ from sqlmodel import select
 
 from app.database.models import (
     DocumentTemplate,
+    GeneratedDocument,
     DocumentationLink,
     User,
     OrganizationTeamsGroup,
@@ -68,14 +70,62 @@ async def update_document_template(id: UUID, data: DocumentTemplateUpdate, sessi
     return template
 
 
+@router.get("/generated-count")
+async def get_generated_document_count(id: UUID, session: SessionDep):
+    """
+    How many generated document versions exist for this template.
+    Used to warn before deleting, since deleting a template destroys them.
+    """
+    result = await session.execute(
+        select(GeneratedDocument).where(GeneratedDocument.template_id == id)
+    )
+    docs = result.scalars().all()
+    return {
+        "count": len(docs),
+        "project_count": len({doc.project_id for doc in docs}),
+    }
+
+
 @router.delete("/")
 async def delete_document_template(id: UUID, session: SessionDep):
+    """
+    Delete a template along with every document generated from it.
+
+    generated_document.template_id is NOT NULL, so the version rows cannot be
+    orphaned — they are removed with the template, and their files on disk are
+    cleaned up too. Callers should warn the user first (see /generated-count).
+    """
     template = await session.get(DocumentTemplate, id)
     if not template:
         raise HTTPException(status_code=404, detail="Document Template not found")
+
+    # Collect file paths before the rows disappear
+    result = await session.execute(
+        select(GeneratedDocument).where(GeneratedDocument.template_id == id)
+    )
+    file_paths = [doc.file_path for doc in result.scalars().all() if doc.file_path]
+
     await session.delete(template)
     await session.commit()
-    return {"detail": "Deleted"}
+
+    # Remove the generated files, plus the now-empty per-template directories
+    removed_files = 0
+    for path in file_paths:
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+                removed_files += 1
+            parent = os.path.dirname(path)
+            if os.path.isdir(parent) and not os.listdir(parent):
+                os.rmdir(parent)
+        except OSError:
+            pass  # never fail the delete because of filesystem cleanup
+
+    return {
+        "detail": "Deleted",
+        "deleted_versions": len(file_paths),
+        "deleted_files": removed_files,
+    }
 
 
 # ===================== Email Template Rendering =====================
