@@ -325,19 +325,3 @@ class ProjectFeatureAssign(BaseModel):
 
 class GenerateFromTemplatesRequest(BaseModel):
     template_ids: list[UUID]
-
-class GeneratedDocumentReadEnriched(BaseModel):
-    """Generated document with template details for display"""
-    id: UUID
-    project_id: UUID
-    template_id: UUID
-    document_type: str
-    status: str
-    created_at: datetime
-    updated_at: datetime
-    # Enriched from template
-    template_name: Optional[str] = None
-    template_type: Optional[str] = None
-    template_version: Optional[int] = None
-    file_format: Optional[str] = None
-    file_path: Optional[str] = None

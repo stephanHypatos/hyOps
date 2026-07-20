@@ -742,6 +742,12 @@ class DocumentTemplate(SQLModel, table=True):
 
 
 class GeneratedDocument(SQLModel, table=True):
+    """One row per generation — the version ledger for generated documents.
+
+    Generating a document never overwrites history: each run appends a new row
+    with the next version_no for that (project, template) pair. The rendered
+    markdown is stored alongside the on-disk file path so a version can be
+    inspected without reading from disk."""
     __tablename__ = "generated_document"
 
     id: UUID = Field(
@@ -749,10 +755,12 @@ class GeneratedDocument(SQLModel, table=True):
     )
     project_id: UUID = Field(foreign_key="project.id")
     template_id: UUID = Field(foreign_key="document_template.id")
+    version_no: int = Field(default=1, index=True)   # 1-based, per project+template
     document_type: str
     markdown_generated: str
-    docx_file_url: str
-    pdf_file_url: str
+    file_path: str                                   # absolute path on disk
+    file_format: str = Field(default="md")           # "md" or "docx"
+    template_version: Optional[float] = Field(default=None)  # template version at generation time
     status: DocumentStatus
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

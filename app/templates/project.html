@@ -554,10 +554,10 @@
                                             <tr>
                                                 <th>Template</th>
                                                 <th>Type</th>
+                                                <th>Version</th>
                                                 <th>Format</th>
-                                                <th>Status</th>
-                                                <th>Modified</th>
-                                                <th style="width:100px">Action</th>
+                                                <th>Generated</th>
+                                                <th style="width:150px">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -568,24 +568,57 @@
                                                     <small>Select templates and click Generate.</small>
                                                 </td>
                                             </tr>
-                                            <template x-for="doc in generatedDocsList" :key="doc.template_id">
+                                        </tbody>
+                                        <template x-for="doc in generatedDocsList" :key="doc.template_id">
+                                            <tbody>
                                                 <tr>
                                                     <td>
                                                         <div class="fw-semibold" x-text="doc.template_name || 'Unknown'"></div>
-                                                        <div class="small text-muted">v<span x-text="doc.template_version"></span></div>
+                                                        <div class="small text-muted">template v<span x-text="doc.template_version"></span></div>
                                                     </td>
                                                     <td><span class="badge text-capitalize" :class="getTemplateTypeBadge(doc.template_type)" x-text="(doc.template_type || '').replace('_', ' ')"></span></td>
+                                                    <td>
+                                                        <span class="badge bg-dark" x-text="'v' + doc.version_no"></span>
+                                                        <button x-show="doc.total_versions > 1"
+                                                                class="btn btn-link btn-sm p-0 ms-1 text-decoration-none"
+                                                                @click="toggleVersions(doc.template_id)">
+                                                            <small x-text="(isVersionsOpen(doc.template_id) ? '▾ ' : '▸ ') + doc.total_versions + ' versions'"></small>
+                                                        </button>
+                                                    </td>
                                                     <td><span class="badge" :class="doc.file_format === 'docx' ? 'bg-primary' : 'bg-info'" x-text="doc.file_format === 'docx' ? '.docx' : '.md'"></span></td>
-                                                    <td><span class="badge bg-success" x-text="doc.status"></span></td>
                                                     <td class="small text-muted" x-text="new Date(doc.created_at).toLocaleString()"></td>
                                                     <td>
                                                         <a :href="`/project/${selectedProject.id}/download-template/${doc.template_id}`" class="btn btn-sm btn-outline-primary" download>
-                                                            <i class="bi bi-download me-1"></i>Download
+                                                            <i class="bi bi-download me-1"></i>Latest
                                                         </a>
                                                     </td>
                                                 </tr>
-                                            </template>
-                                        </tbody>
+                                                <tr x-show="isVersionsOpen(doc.template_id)" x-transition>
+                                                    <td colspan="6" class="bg-light py-2">
+                                                        <div class="small text-muted mb-2 ps-2">Version history</div>
+                                                        <table class="table table-sm mb-0 bg-white">
+                                                            <tbody>
+                                                                <template x-for="v in (docVersions[doc.template_id] || [])" :key="v.id">
+                                                                    <tr>
+                                                                        <td style="width:70px"><span class="badge" :class="v.version_no === doc.version_no ? 'bg-dark' : 'bg-secondary'" x-text="'v' + v.version_no"></span></td>
+                                                                        <td class="small text-muted" x-text="new Date(v.created_at).toLocaleString()"></td>
+                                                                        <td class="small text-muted" x-text="'template v' + v.template_version"></td>
+                                                                        <td style="width:120px" class="text-end">
+                                                                            <a :href="`/project/${selectedProject.id}/download-version/${v.id}`" class="btn btn-sm btn-outline-secondary" download>
+                                                                                <i class="bi bi-download me-1"></i>Download
+                                                                            </a>
+                                                                        </td>
+                                                                    </tr>
+                                                                </template>
+                                                                <tr x-show="!docVersions[doc.template_id]">
+                                                                    <td colspan="4" class="text-center text-muted small py-2">Loading…</td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </template>
                                     </table>
                                 </div>
                             </div>
@@ -613,6 +646,8 @@
             docTemplates: [],
             selectedTemplateIds: [],
             generatedDocsList: [],
+            expandedVersionDocs: [],
+            docVersions: {},
 
             form: {
                 id: '', name: '', type: 'pilot', status: 'draft', start_date: '', customer_id: '', partner_id: '', deal_winner_id: '', primary_usecase_id: '',
@@ -691,12 +726,33 @@
                 } catch (e) { console.error("Error fetching generated docs"); }
             },
 
+            // ========== VERSION HISTORY ==========
+            isVersionsOpen(templateId) {
+                return this.expandedVersionDocs.includes(templateId);
+            },
+
+            async toggleVersions(templateId) {
+                if (this.isVersionsOpen(templateId)) {
+                    this.expandedVersionDocs = this.expandedVersionDocs.filter(id => id !== templateId);
+                    return;
+                }
+                this.expandedVersionDocs = [...this.expandedVersionDocs, templateId];
+                await this.fetchDocVersions(templateId);
+            },
+
+            async fetchDocVersions(templateId) {
+                if (!this.selectedProject) return;
+                try {
+                    const res = await fetch(`${this.apiBase}/${this.selectedProject.id}/document-versions/${templateId}`);
+                    if (!res.ok) throw new Error();
+                    this.docVersions = { ...this.docVersions, [templateId]: await res.json() };
+                } catch (e) { console.error("Error fetching version history"); }
+            },
+
             async generateFromTemplates() {
                 if (!this.selectedProject || this.selectedTemplateIds.length === 0) return;
                 if (!confirm(`Generate ${this.selectedTemplateIds.length} document(s)?`)) return;
 
-                // Clear previous documents — start fresh
-                this.generatedDocsList = [];
                 this.generatingDocs = true;
                 
                 try {
@@ -710,9 +766,14 @@
                         throw new Error(err.detail || "Error generating documents");
                     }
 
-                    // Use the generation API response directly — shows only newly generated docs
-                    const result = await res.json();
-                    this.generatedDocsList = Array.isArray(result) ? result : (result.documents || []);
+                    await res.json();
+
+                    // Reload the full list so version numbers reflect the new generation
+                    await this.fetchGeneratedDocuments();
+                    // Refresh any version history that is currently expanded
+                    await Promise.all(
+                        this.expandedVersionDocs.map(id => this.fetchDocVersions(id))
+                    );
 
                     // Stop the spinner NOW — documents are ready
                     this.generatingDocs = false;
@@ -836,10 +897,15 @@
                 this.selectedProject = proj; this.activeTab = 'stakeholders'; this.stakeholderForm = { user_id: '', role: '' };
                 this.selectedTemplateIds = []; this.generatedDocsList = [];
                 this.featureForm = { feature_id: '' }; this.projectFeatures = [];
-                // Only fetch stakeholders + custom features. We do NOT fetch old generated documents anymore.
-                await Promise.all([this.fetchStakeholders(proj.id), this.fetchProjectFeatures(proj.id)]);
+                this.expandedVersionDocs = []; this.docVersions = {};
+                // Generated documents are now version-tracked in the DB, so load the history too
+                await Promise.all([
+                    this.fetchStakeholders(proj.id),
+                    this.fetchProjectFeatures(proj.id),
+                    this.fetchGeneratedDocuments(),
+                ]);
             },
-            closeProject() { this.selectedProject = null; this.stakeholders = []; this.generatedDocsList = []; this.projectFeatures = []; },
+            closeProject() { this.selectedProject = null; this.stakeholders = []; this.generatedDocsList = []; this.projectFeatures = []; this.expandedVersionDocs = []; this.docVersions = {}; },
 
             async fetchStakeholders(projectId) { this.loadingStakeholders = true; try { const res = await fetch(`${this.apiBase}/${projectId}/stakeholders`); if (!res.ok) throw new Error(); this.stakeholders = await res.json(); } catch (e) {} finally { this.loadingStakeholders = false; } },
             async addStakeholder() { if (!this.selectedProject || !this.stakeholderForm.user_id || !this.stakeholderForm.role) return; try { const res = await fetch(`${this.apiBase}/${this.selectedProject.id}/stakeholder`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(this.stakeholderForm) }); if (!res.ok) { const err = await res.json(); throw new Error(err.detail || "Error"); } this.stakeholderForm = { user_id: '', role: '' }; await this.fetchStakeholders(this.selectedProject.id); } catch (e) { alert(e.message); } },

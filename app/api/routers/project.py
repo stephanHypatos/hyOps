@@ -9,7 +9,8 @@ from sqlmodel import select
 from enum import Enum
 from app.database.models import (
     Project, ProjectStakeholder, ProjectUsecase, ProjectFeature,
-    User, Usecase, Feature, Capability, DocumentTemplate
+    User, Usecase, Feature, Capability, DocumentTemplate,
+    GeneratedDocument, DocumentStatus, Organization
 )
 from app.database.session import SessionDep
 from app.api.schemas.project import (
@@ -266,9 +267,9 @@ async def remove_feature(project_id: UUID, feature_id: UUID, session: SessionDep
 # ===================== Helper Functions =====================
 
 FEATURE_SKIP = {
-    "id", "capability_id", "owner_id", "created_at", "updated_at", 
-    "multiple_value", "scoping_questionnaire", "reference_documentation", 
-    "included_in_ootb", "default_enabled", "active", "capability", "owner", 
+    "id", "capability_id", "owner_id", "created_at", "updated_at",
+    "multiple_value", "scoping_questionnaire",
+    "included_in_ootb", "default_enabled", "active", "capability", "owner",
     "scope_specifications", "cost_drivers", "feature_efforts", "usecases"
 }
 
@@ -314,6 +315,18 @@ def _serialize_value(val):
     return str(val)
 
 
+def _empty_fields(model_cls, skip_set):
+    """
+    Same keys as _extract_fields would produce, but all blank.
+
+    Used for optional relations (e.g. a project with no partner) so that
+    {{partner.key}} renders as an empty string instead of leaking the literal
+    placeholder text into a customer-facing document.
+    """
+    fields = getattr(model_cls, 'model_fields', None) or getattr(model_cls, '__sqlmodel_fields__', {})
+    return {col: "" for col in fields if col not in skip_set}
+
+
 def _extract_fields(obj, skip_set):
     result = {}
     # Works with both Pydantic v1 and v2
@@ -330,9 +343,22 @@ def build_render_context(project: Project) -> dict:
     """Build nested dict from Project ORM for {{project.name}} style placeholders."""
     context = {
         "project": _extract_fields(project, PROJECT_SKIP),
-        "customer": _extract_fields(project.customer, ORG_SKIP) if project.customer else {},
-        "deal_winner": _extract_fields(project.deal_winner, USER_SKIP) if project.deal_winner else {},
-        "primary_usecase": _extract_fields(project.primary_usecase, USECASE_SKIP) if project.primary_usecase else {},
+        "customer": (
+            _extract_fields(project.customer, ORG_SKIP) if project.customer
+            else _empty_fields(Organization, ORG_SKIP)
+        ),
+        "partner": (
+            _extract_fields(project.partner, ORG_SKIP) if project.partner
+            else _empty_fields(Organization, ORG_SKIP)
+        ),
+        "deal_winner": (
+            _extract_fields(project.deal_winner, USER_SKIP) if project.deal_winner
+            else _empty_fields(User, USER_SKIP)
+        ),
+        "primary_usecase": (
+            _extract_fields(project.primary_usecase, USECASE_SKIP) if project.primary_usecase
+            else _empty_fields(Usecase, USECASE_SKIP)
+        ),
         "stakeholders": [],
         "features": [], # NEW: Add features list for iteration
     }
@@ -344,7 +370,9 @@ def build_render_context(project: Project) -> dict:
                 "last_name": user.last_name,
                 "email": getattr(user, 'email', ''),
                 "phone": getattr(user, 'phone', ''),
-                "type": str(getattr(user, 'type', '')),
+                # _serialize_value unwraps the enum — str() would leak "UserType.internal"
+                "type": _serialize_value(getattr(user, 'type', '')),
+                "role": _serialize_value(getattr(user, 'role', '')),
                 "subtype": str(getattr(user.subtype, 'name', '')) if hasattr(user, 'subtype') and user.subtype else '',
             })
 
@@ -513,38 +541,77 @@ def save_generated_file(output_dir: str, filename: str, content: str, file_forma
 
 # ===================== Template-Based Generation Endpoints =====================
 
+def _media_type(file_format: str) -> str:
+    if file_format == "docx":
+        return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    if file_format == "md":
+        return "text/markdown"
+    return "application/octet-stream"
+
+
+def _version_dir(project_id: UUID, template_id: UUID) -> str:
+    """One directory per template, holding every version of that document."""
+    return os.path.join(basedir, 'generated_documents', str(project_id), str(template_id))
+
+
+def _serialize_version(doc: GeneratedDocument, template: DocumentTemplate | None) -> dict:
+    return {
+        "id": str(doc.id),
+        "template_id": str(doc.template_id),
+        "template_name": template.name if template else "Unknown",
+        "template_type": (
+            template.type.value if template and hasattr(template.type, 'value')
+            else (str(template.type) if template else "")
+        ),
+        "template_version": doc.template_version,
+        "version_no": doc.version_no,
+        "file_format": doc.file_format,
+        "status": doc.status.value if hasattr(doc.status, 'value') else str(doc.status),
+        "created_at": doc.created_at.isoformat(),
+    }
+
+
 @router.get("/{project_id}/generated-documents")
 async def get_generated_documents(project_id: UUID, session: SessionDep):
     """
-    List generated documents by scanning the file system.
-    No database queries — just checks which files exist on disk.
+    List the latest version of each generated document for this project.
+    Backed by the generated_document version ledger.
     """
-    output_dir = os.path.join(basedir, 'generated_documents', str(project_id))
+    result = await session.execute(
+        select(GeneratedDocument)
+        .where(GeneratedDocument.project_id == project_id)
+        .order_by(GeneratedDocument.version_no.desc())
+    )
+    docs = result.scalars().all()
+
+    # Rows are ordered newest-first, so the first hit per template is the latest
+    latest_by_template: dict[UUID, GeneratedDocument] = {}
+    for doc in docs:
+        latest_by_template.setdefault(doc.template_id, doc)
+
     results = []
+    for template_id, doc in latest_by_template.items():
+        template = await session.get(DocumentTemplate, template_id)
+        payload = _serialize_version(doc, template)
+        payload["total_versions"] = sum(1 for d in docs if d.template_id == template_id)
+        results.append(payload)
 
-    # Get all active templates to check which ones have files
-    result = await session.execute(select(DocumentTemplate))
-    templates = result.scalars().all()
-
-    for tmpl in templates:
-        file_format = tmpl.file_format or 'md'
-        filename = f"{tmpl.id}.{file_format}"
-        file_path = os.path.join(output_dir, filename)
-
-        if os.path.exists(file_path):
-            results.append({
-                "template_id": str(tmpl.id),
-                "template_name": tmpl.name,
-                "template_type": tmpl.type.value if hasattr(tmpl.type, 'value') else str(tmpl.type),
-                "template_version": tmpl.version,
-                "file_format": file_format,
-                "status": "final",
-                "created_at": datetime.fromtimestamp(os.path.getmtime(file_path)).isoformat(),
-            })
-
+    results.sort(key=lambda r: r["created_at"], reverse=True)
     return results
 
 
+@router.get("/{project_id}/document-versions/{template_id}")
+async def get_document_versions(project_id: UUID, template_id: UUID, session: SessionDep):
+    """Full version history for one document, newest first."""
+    template = await session.get(DocumentTemplate, template_id)
+
+    result = await session.execute(
+        select(GeneratedDocument)
+        .where(GeneratedDocument.project_id == project_id)
+        .where(GeneratedDocument.template_id == template_id)
+        .order_by(GeneratedDocument.version_no.desc())
+    )
+    return [_serialize_version(doc, template) for doc in result.scalars().all()]
 
 
 @router.post("/{project_id}/generate-from-templates")
@@ -555,8 +622,9 @@ async def generate_from_templates(
 ):
     """
     Generate documents from selected templates.
-    Saves files to disk only — NO database records created.
-    Overwrites existing files for the same template.
+
+    Never overwrites: each run appends a new version (v1, v2, v3 …) both on disk
+    and in the generated_document ledger, so earlier versions stay downloadable.
     """
     project = await session.get(Project, project_id)
     if not project:
@@ -567,7 +635,7 @@ async def generate_from_templates(
 
     for template_id in data.template_ids:
         template = await session.get(DocumentTemplate, template_id)
-        
+
         # VALIDATION: Skip if template doesn't exist OR is not active
         if not template or not template.is_active:
             continue
@@ -575,21 +643,43 @@ async def generate_from_templates(
         # 1. Replace placeholders
         rendered = replace_placeholders(template.markdown_content, context)
 
-        # 2. Save to disk with predictable filename: {template_id}.{format}
-        file_format = template.file_format or 'md'
-        output_dir = os.path.join(basedir, 'generated_documents', str(project_id))
-        filename = f"{template_id}.{file_format}"
-        file_path = save_generated_file(output_dir, filename, rendered, file_format)
+        # 2. Next version number for this project + template
+        latest = (await session.execute(
+            select(GeneratedDocument)
+            .where(GeneratedDocument.project_id == project_id)
+            .where(GeneratedDocument.template_id == template_id)
+            .order_by(GeneratedDocument.version_no.desc())
+        )).scalars().first()
+        version_no = (latest.version_no + 1) if latest else 1
 
-        results.append({
-            "template_id": str(template_id),
-            "template_name": template.name,
-            "template_type": template.type.value if hasattr(template.type, 'value') else str(template.type),
-            "template_version": template.version,
-            "file_format": file_format,
-            "status": "final",
-            "created_at": datetime.now().isoformat(),
-        })
+        # 3. Save to disk as {project_id}/{template_id}/v{n}.{format}
+        file_format = template.file_format or 'md'
+        file_path = save_generated_file(
+            _version_dir(project_id, template_id),
+            f"v{version_no}.{file_format}",
+            rendered,
+            file_format,
+        )
+
+        # 4. Record the version
+        doc = GeneratedDocument(
+            project_id=project_id,
+            template_id=template_id,
+            version_no=version_no,
+            document_type=template.type.value if hasattr(template.type, 'value') else str(template.type),
+            markdown_generated=rendered,
+            file_path=file_path,
+            file_format=file_format,
+            template_version=template.version,
+            status=DocumentStatus.final,
+        )
+        session.add(doc)
+        await session.commit()
+        await session.refresh(doc)
+
+        payload = _serialize_version(doc, template)
+        payload["total_versions"] = version_no
+        results.append(payload)
 
     # Optional: Handle case where all requested templates were inactive/not found
     if not results and data.template_ids:
@@ -607,34 +697,48 @@ async def download_template_document(
     template_id: UUID,
     session: SessionDep
 ):
-    """
-    Download a generated document by project_id and template_id.
-    Reads directly from disk — no database lookup needed.
-    """
-    template = await session.get(DocumentTemplate, template_id)
-    if not template:
-        raise HTTPException(status_code=404, detail="Template not found")
+    """Download the latest version of a generated document."""
+    doc = (await session.execute(
+        select(GeneratedDocument)
+        .where(GeneratedDocument.project_id == project_id)
+        .where(GeneratedDocument.template_id == template_id)
+        .order_by(GeneratedDocument.version_no.desc())
+    )).scalars().first()
 
-    file_format = template.file_format or 'md'
-    filename = f"{template_id}.{file_format}"
-    file_path = os.path.join(basedir, 'generated_documents', str(project_id), filename)
+    if not doc:
+        raise HTTPException(status_code=404, detail="No generated document found. Generate it first.")
 
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File not found. Generate it first.")
+    return _version_file_response(doc, await session.get(DocumentTemplate, template_id))
 
-    # Create a human-readable download filename
-    safe_name = re.sub(r'[^\w]', '_', template.name)[:40]
-    download_name = f"{safe_name}.{file_format}"
 
-    if file_format == "docx":
-        media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    elif file_format == "md":
-        media_type = "text/markdown"
-    else:
-        media_type = "application/octet-stream"
+@router.get("/{project_id}/download-version/{version_id}")
+async def download_document_version(
+    project_id: UUID,
+    version_id: UUID,
+    session: SessionDep
+):
+    """Download one specific version of a generated document."""
+    doc = await session.get(GeneratedDocument, version_id)
+    if not doc or doc.project_id != project_id:
+        raise HTTPException(status_code=404, detail="Version not found for this project")
+
+    return _version_file_response(doc, await session.get(DocumentTemplate, doc.template_id))
+
+
+def _version_file_response(doc: GeneratedDocument, template: DocumentTemplate | None) -> FileResponse:
+    if not os.path.exists(doc.file_path):
+        raise HTTPException(
+            status_code=404,
+            detail=f"File for v{doc.version_no} is missing on disk.",
+        )
+
+    # Create a human-readable download filename, e.g. Statement_of_Work_v3.md
+    base = template.name if template else "document"
+    safe_name = re.sub(r'[^\w]', '_', base)[:40]
+    download_name = f"{safe_name}_v{doc.version_no}.{doc.file_format}"
 
     return FileResponse(
-        path=file_path,
-        media_type=media_type,
-        filename=download_name
+        path=doc.file_path,
+        media_type=_media_type(doc.file_format),
+        filename=download_name,
     )

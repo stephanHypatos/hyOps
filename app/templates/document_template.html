@@ -533,10 +533,44 @@
                     label: '🏢 Customer (Organization)',
                     items: [
                         { key: 'customer.name', label: 'Customer Name' },
+                        { key: 'customer.key', label: 'Customer Key (e.g. ACM)' },
                         { key: 'customer.industry', label: 'Industry' },
                         { key: 'customer.country', label: 'Country' },
                         { key: 'customer.email', label: 'Customer Email' },
                         { key: 'customer.company_overview', label: 'Company Overview' },
+                        { key: 'customer.regions_operation', label: 'Regions of Operation' },
+                        { key: 'customer.number_subsidiaries', label: 'Number of Subsidiaries' },
+                        { key: 'customer.languages', label: 'Customer Languages' },
+                        { key: 'customer.type', label: 'Customer Type' },
+                        { key: 'customer.account_status', label: 'Account Status' },
+                    ]
+                },
+                {
+                    label: '🤝 Partner (Organization, optional)',
+                    items: [
+                        { key: 'partner.name', label: 'Partner Name' },
+                        { key: 'partner.key', label: 'Partner Key (e.g. EYG)' },
+                        { key: 'partner.industry', label: 'Partner Industry' },
+                        { key: 'partner.country', label: 'Partner Country' },
+                        { key: 'partner.email', label: 'Partner Email' },
+                        { key: 'partner.company_overview', label: 'Partner Overview' },
+                        { key: 'partner.regions_operation', label: 'Partner Regions of Operation' },
+                        { key: 'partner.number_subsidiaries', label: 'Partner Subsidiaries' },
+                        { key: 'partner.languages', label: 'Partner Languages' },
+                        { key: 'partner.type', label: 'Partner Type' },
+                        { key: 'partner.account_status', label: 'Partner Account Status' },
+                    ]
+                },
+                {
+                    label: '👥 Stakeholders (Use in Loop)',
+                    items: [
+                        { key: 'stakeholder.first_name', label: 'First Name (inside loop)' },
+                        { key: 'stakeholder.last_name', label: 'Last Name (inside loop)' },
+                        { key: 'stakeholder.email', label: 'Email (inside loop)' },
+                        { key: 'stakeholder.phone', label: 'Phone (inside loop)' },
+                        { key: 'stakeholder.subtype', label: 'Role / Subtype (inside loop)' },
+                        { key: 'stakeholder.type', label: 'Type: customer/partner/internal (inside loop)' },
+                        { key: 'stakeholder.role', label: 'Access Role: admin/enduser (inside loop)' },
                     ]
                 },
                 {
@@ -545,6 +579,9 @@
                         { key: 'deal_winner.first_name', label: 'Winner First Name' },
                         { key: 'deal_winner.last_name', label: 'Winner Last Name' },
                         { key: 'deal_winner.email', label: 'Winner Email' },
+                        { key: 'deal_winner.phone', label: 'Winner Phone' },
+                        { key: 'deal_winner.type', label: 'Winner Type' },
+                        { key: 'deal_winner.role', label: 'Winner Access Role' },
                     ]
                 },
                 {
@@ -561,6 +598,7 @@
                         { key: 'feature.service_description', label: 'Service Description' },
                         { key: 'feature.deliverables', label: 'Deliverables' },
                         { key: 'feature.scope_type', label: 'Scope Type' },
+                        { key: 'feature.reference_documentation', label: 'Reference Documentation' },
                     ]
                 },
                 {
